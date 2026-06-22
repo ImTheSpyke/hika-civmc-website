@@ -149,6 +149,9 @@
   "admin.settings.autoApproveUsernameChangesDesc": "Automatically approve Minecraft username change requests without waiting for admin review.",
   "admin.settings.autoApproveNewspapers": "Auto-confirm newspaper creation",
   "admin.settings.autoApproveNewspapersDesc": "Automatically approve newspaper creation requests, making them immediately active.",
+  "admin.settings.rebackfill": "Re-link player notes",
+  "admin.settings.rebackfillDesc": "Scan all notes and tags and link them to their matching registered account. Run this if notes appear unlinked after account approval or username changes.",
+  "admin.settings.rebackfillRun": "Run now",
 
   "profile.title": "My Profile",
   "profile.discord": "Discord",

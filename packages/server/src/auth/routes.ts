@@ -114,9 +114,24 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           "UPDATE users SET status = 'approved', is_admin = TRUE WHERE id = ?",
           [user.id]
         );
+        // mc_username may already be set if this is a re-login after onboarding
+        const [suRows] = await query<RowDataPacket[]>(
+          "SELECT mc_username FROM users WHERE id = ?", [user.id]
+        );
+        if (suRows[0]?.mc_username) {
+          await backfillUsername(suRows[0].mc_username as string, user.id);
+        }
       } else if (isNew && await getSetting("auto_approve_accounts")) {
         await query("UPDATE users SET status = 'approved' WHERE id = ?", [user.id]);
         await adminLog(null, "user.approve", "user", user.id, { auto: true });
+        // mc_username is NULL for brand-new accounts (set during onboarding later),
+        // but handle the tombstone-resurrection case where it might already be set.
+        const [auRows] = await query<RowDataPacket[]>(
+          "SELECT mc_username FROM users WHERE id = ?", [user.id]
+        );
+        if (auRows[0]?.mc_username) {
+          await backfillUsername(auRows[0].mc_username as string, user.id);
+        }
       }
 
       // Create session (30-day expiry)

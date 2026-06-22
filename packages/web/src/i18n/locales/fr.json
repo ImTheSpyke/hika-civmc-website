@@ -148,6 +148,9 @@
   "admin.settings.autoApproveUsernameChangesDesc": "Approuve automatiquement les demandes de changement de pseudo Minecraft sans attendre une révision admin.",
   "admin.settings.autoApproveNewspapers": "Confirmation auto de création de journal",
   "admin.settings.autoApproveNewspapersDesc": "Approuve automatiquement les demandes de création de journal, les rendant immédiatement actifs.",
+  "admin.settings.rebackfill": "Re-lier les notes joueurs",
+  "admin.settings.rebackfillDesc": "Analyse toutes les notes et tags et les relie au compte enregistré correspondant. À utiliser si des notes apparaissent non liées après une approbation ou un changement de pseudo.",
+  "admin.settings.rebackfillRun": "Exécuter",
 
   "profile.title": "Mon profil",
   "profile.discord": "Discord",

@@ -461,6 +461,20 @@ function AdminNewspapers({ t }: { t: (k: string) => string }) {
 function AdminSettings({ t }: { t: (k: string, v?: Record<string, string | number>) => string }) {
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  const [rebackfilling, setRebackfilling] = useState(false);
+  const [rebackfillDone, setRebackfillDone] = useState(false);
+
+  async function triggerRebackfill() {
+    setRebackfilling(true);
+    setRebackfillDone(false);
+    try {
+      await api.post("/api/admin/rebackfill");
+      setRebackfillDone(true);
+      setTimeout(() => setRebackfillDone(false), 3000);
+    } finally {
+      setRebackfilling(false);
+    }
+  }
 
   useEffect(() => {
     api.get<SiteSettings>("/api/admin/settings").then(setSettings);
@@ -528,6 +542,21 @@ function AdminSettings({ t }: { t: (k: string, v?: Record<string, string | numbe
             </button>
           </div>
         ))}
+
+        <div className="card" style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, marginBottom: 2 }}>{t("admin.settings.rebackfill")}</div>
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{t("admin.settings.rebackfillDesc")}</div>
+          </div>
+          <button
+            className="btn-secondary"
+            onClick={triggerRebackfill}
+            disabled={rebackfilling}
+            style={{ flexShrink: 0 }}
+          >
+            {rebackfilling ? t("common.loading") : rebackfillDone ? t("common.saved") : t("admin.settings.rebackfillRun")}
+          </button>
+        </div>
       </div>
     </div>
   );

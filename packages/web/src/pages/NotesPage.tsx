@@ -544,13 +544,19 @@ export function NotesPage() {
     const [fetchedNotes, fetchedTags, fetchedUsers] = await Promise.all([
       api.get<PlayerNote[]>("/api/player-notes"),
       api.get<Tag[]>("/api/tags"),
-      allUsers.current.length === 0
-        ? api.get<UserResult[]>("/api/users/all")
-        : Promise.resolve(allUsers.current),
+      api.get<UserResult[]>("/api/users/all"),
     ]);
-    if (fetchedUsers !== allUsers.current) allUsers.current = fetchedUsers;
+    allUsers.current = fetchedUsers;
     setNotes(fetchedNotes);
     setAllTags(fetchedTags);
+    // Refresh discord name for currently selected player in case linking just resolved
+    setSelected((currentSelected) => {
+      if (currentSelected) {
+        const fresh = fetchedUsers.find((u) => u.mcUsername === currentSelected);
+        setSelectedDiscordName(fresh?.discordUsername ?? null);
+      }
+      return currentSelected;
+    });
 
     if (fetchedNotes.length > 0 && fetchedTags.length > 0) {
       const entries = await Promise.all(

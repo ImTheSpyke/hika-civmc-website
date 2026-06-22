@@ -92,12 +92,12 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
       if (await getSetting("auto_approve_username_changes")) {
         await releaseUsername(userId);
         await query("UPDATE users SET mc_username = ?, mc_verified = FALSE WHERE id = ?", [mcUsername, userId]);
-        await backfillUsername(mcUsername, userId);
         await query(
           "UPDATE username_change_requests SET status = 'approved', resolved_at = NOW() WHERE id = ?",
           [reqId]
         );
         await adminLog(null, "user.username_change_approve", "user", userId, { mcUsername, auto: true });
+        await backfillUsername(mcUsername, userId);
       }
 
       return reply.code(201).send({ id: reqId });
@@ -220,7 +220,7 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
                 mc_username as mcUsername, mc_verified as mcVerified, public_faction_tag as publicFactionTag
          FROM users WHERE status = 'approved' ORDER BY mc_username ASC`
       );
-      reply.header("Cache-Control", "private, max-age=60");
+      reply.header("Cache-Control", "no-store");
       return reply.send(
         rows.map((r) => ({
           ...r,

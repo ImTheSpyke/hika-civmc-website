@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
 import { initDb } from "./db.js";
 import { loadSession } from "./auth/session.js";
+import { rebackfillAll } from "./modules/users/service.js";
 import { authRoutes } from "./auth/routes.js";
 import { usersRoutes } from "./modules/users/routes.js";
 import { avatarsRoutes } from "./modules/avatars/routes.js";
@@ -23,6 +24,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function start(): Promise<void> {
   await initDb();
+  await rebackfillAll();
 
   const app = Fastify({ logger: true });
 

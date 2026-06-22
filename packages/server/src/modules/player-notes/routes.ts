@@ -12,11 +12,20 @@ export async function playerNotesRoutes(app: FastifyInstance): Promise<void> {
       const authorId = req.sessionUser!.id;
       const { tag } = req.query;
 
+      // Join via target_user_id when set; fall back to mc_username match so
+      // notes created before an account existed still resolve correctly.
+      // linked_id is non-null only when the FK was already set (used to detect stale rows).
       let sql = `
         SELECT pn.target_mc_username, pn.body, pn.updated_at,
-               u.id as userId, u.discord_display_name, u.mc_verified, u.public_faction_tag
+               pn.target_user_id as linked_id,
+               COALESCE(u.id, u2.id) as userId,
+               COALESCE(u.discord_display_name, u2.discord_display_name) as discord_display_name,
+               COALESCE(u.mc_verified, u2.mc_verified) as mc_verified,
+               COALESCE(u.public_faction_tag, u2.public_faction_tag) as public_faction_tag
         FROM player_notes pn
         LEFT JOIN users u ON u.id = pn.target_user_id
+        LEFT JOIN users u2 ON u2.mc_username = pn.target_mc_username COLLATE utf8mb4_bin
+          AND u2.status = 'approved' AND pn.target_user_id IS NULL
         WHERE pn.author_id = ?`;
       const params: unknown[] = [authorId];
 
@@ -32,6 +41,28 @@ export async function playerNotesRoutes(app: FastifyInstance): Promise<void> {
       sql += " ORDER BY pn.updated_at DESC";
 
       const [rows] = await query<RowDataPacket[]>(sql, params);
+
+      // Opportunistically repair any stale NULL target_user_id rows that the
+      // fallback join just resolved — keeps future queries fast.
+      const stale = rows.filter((r) => r.userId && r.linked_id == null);
+      if (stale.length) {
+        // Re-run backfill for each distinct resolved user (fire-and-forget)
+        const seen = new Set<number>();
+        for (const r of stale) {
+          if (!seen.has(r.userId)) {
+            seen.add(r.userId as number);
+            query(
+              "UPDATE player_notes SET target_user_id = ? WHERE target_mc_username = ? COLLATE utf8mb4_bin AND target_user_id IS NULL",
+              [r.userId, r.target_mc_username]
+            ).catch(() => {});
+            query(
+              "UPDATE player_tags SET target_user_id = ? WHERE target_mc_username = ? COLLATE utf8mb4_bin AND target_user_id IS NULL",
+              [r.userId, r.target_mc_username]
+            ).catch(() => {});
+          }
+        }
+      }
+
       return reply.send(
         rows.map((r) => ({
           mcUsername: r.target_mc_username,
