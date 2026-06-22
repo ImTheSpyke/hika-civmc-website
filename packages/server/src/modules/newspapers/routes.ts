@@ -5,19 +5,30 @@ import { adminLog } from "../admin/service.js";
 import type { RowDataPacket } from "mysql2";
 
 export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
-  // Public list of approved + active newspapers (no owner exposed)
+  // Public list of approved newspapers (active + archived, no owner exposed)
   app.get("/api/newspapers", { preHandler: requireOnboarded }, async (req, reply) => {
     const [rows] = await query<RowDataPacket[]>(
-      `SELECT id, name, description, created_at
-       FROM newspapers WHERE status = 'approved' AND active = TRUE
+      `SELECT id, name, description, active, archived, created_at
+       FROM newspapers WHERE status = 'approved'
        ORDER BY created_at DESC`
     );
     const [reported] = await query<RowDataPacket[]>(
       "SELECT target_id FROM reports WHERE reporter_id = ? AND target_type = 'newspaper'",
       [req.sessionUser!.id]
     );
+    const [subs] = await query<RowDataPacket[]>(
+      "SELECT newspaper_id FROM newspaper_subscriptions WHERE user_id = ?",
+      [req.sessionUser!.id]
+    );
     const reportedSet = new Set(reported.map((r) => r.target_id as number));
-    return reply.send(rows.map((r) => ({ ...r, reported: reportedSet.has(r.id as number) })));
+    const subsSet = new Set(subs.map((s) => s.newspaper_id as number));
+    return reply.send(rows.map((r) => ({
+      ...r,
+      active: Boolean(r.active),
+      archived: Boolean(r.archived),
+      reported: reportedSet.has(r.id as number),
+      subscribed: subsSet.has(r.id as number),
+    })));
   });
 
   // Newspaper + its articles. Owner sees their own (any state) for management;
@@ -69,6 +80,11 @@ export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
       );
       const reportedArticles = new Set(repArticles.map((r) => r.target_id as number));
 
+      const [subRow] = await query<RowDataPacket[]>(
+        "SELECT 1 FROM newspaper_subscriptions WHERE user_id = ? AND newspaper_id = ?",
+        [uid, id]
+      );
+
       return reply.send({
         id: np.id,
         name: np.name,
@@ -79,6 +95,7 @@ export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
         status: np.status,
         mine: isOwner,
         reported: repNp.length > 0,
+        subscribed: subRow.length > 0,
         articles: articles.map((a) => ({
           id: a.id,
           title: a.title,
@@ -239,6 +256,58 @@ export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
       await query("UPDATE newspapers SET archived = TRUE WHERE id = ?", [np.id]);
       await adminLog(req.sessionUser!.id, "newspaper.archive", "newspaper", np.id as number);
       return reply.send({ ok: true });
+    }
+  );
+
+  // Subscribe to a newspaper
+  app.post<{ Params: { id: string } }>(
+    "/api/newspapers/:id/subscribe",
+    { preHandler: requireOnboarded },
+    async (req, reply) => {
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) return reply.code(404).send({ error: { code: "error.notFound", message: "Not found" } });
+      const [rows] = await query<RowDataPacket[]>(
+        "SELECT id FROM newspapers WHERE id = ? AND status = 'approved'",
+        [id]
+      );
+      if (!rows.length) return reply.code(404).send({ error: { code: "error.notFound", message: "Not found" } });
+      await query(
+        "INSERT IGNORE INTO newspaper_subscriptions (user_id, newspaper_id) VALUES (?, ?)",
+        [req.sessionUser!.id, id]
+      );
+      return reply.code(201).send({ ok: true });
+    }
+  );
+
+  // Unsubscribe from a newspaper
+  app.delete<{ Params: { id: string } }>(
+    "/api/newspapers/:id/subscribe",
+    { preHandler: requireOnboarded },
+    async (req, reply) => {
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) return reply.code(404).send({ error: { code: "error.notFound", message: "Not found" } });
+      await query(
+        "DELETE FROM newspaper_subscriptions WHERE user_id = ? AND newspaper_id = ?",
+        [req.sessionUser!.id, id]
+      );
+      return reply.send({ ok: true });
+    }
+  );
+
+  // List subscribed newspapers
+  app.get(
+    "/api/me/subscriptions",
+    { preHandler: requireOnboarded },
+    async (req, reply) => {
+      const [rows] = await query<RowDataPacket[]>(
+        `SELECT n.id, n.name, n.description, n.active, n.archived, n.created_at
+         FROM newspapers n
+         JOIN newspaper_subscriptions s ON s.newspaper_id = n.id
+         WHERE s.user_id = ? AND n.status = 'approved'
+         ORDER BY s.created_at DESC`,
+        [req.sessionUser!.id]
+      );
+      return reply.send(rows.map((r) => ({ ...r, active: Boolean(r.active), archived: Boolean(r.archived) })));
     }
   );
 }

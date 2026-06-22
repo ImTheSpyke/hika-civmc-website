@@ -77,6 +77,13 @@
   "newspapers.confirmArchiveBody": "Archiving stops all future publishing. Only a super-admin can lift the archive afterwards.",
   "newspapers.confirmDeleteArticleTitle": "Delete this article?",
   "newspapers.confirmDeleteArticleBody": "“{title}” will be permanently deleted. This cannot be undone.",
+  "newspapers.noArticles": "No articles published yet.",
+  "newspapers.newArticle": "Write a new article",
+  "newspapers.backToList": "Newspapers",
+  "newspapers.subscribe": "Subscribe",
+  "newspapers.unsubscribe": "Unsubscribe",
+  "newspapers.subscribed": "Subscribed",
+  "newspapers.noSubscriptions": "You haven't subscribed to any newspapers yet.",
 
   "events.title": "Events",
   "events.request": "Request an event",

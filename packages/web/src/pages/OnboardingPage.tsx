@@ -54,8 +54,13 @@ export function OnboardingPage() {
           </p>
         </div>
 
-        <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "12px 0" }}>
-          <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
+        <label style={{ display: "flex", gap: 8, alignItems: "flex-start", margin: "12px 0", cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={confirmed}
+            onChange={(e) => setConfirmed(e.target.checked)}
+            style={{ width: "auto", marginTop: 3, flexShrink: 0 }}
+          />
           <span>{t("onboarding.confirmCheckbox", { name: mcUsername.trim() || "…" })}</span>
         </label>
 

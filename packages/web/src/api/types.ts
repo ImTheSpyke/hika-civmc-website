@@ -48,6 +48,7 @@ export interface Newspaper {
   archived?: boolean;
   mine?: boolean;
   reported?: boolean;
+  subscribed?: boolean;
   created_at: string;
 }
 

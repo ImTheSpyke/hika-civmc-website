@@ -11,9 +11,9 @@ import { useMemo } from "react";
  * Everything is built from React elements (never dangerouslySetInnerHTML), so the
  * input is inert by construction — no HTML in the source string is interpreted.
  */
-export function Markdown({ children, className }: { children: string; className?: string }) {
+export function Markdown({ children, className, style }: { children: string; className?: string; style?: React.CSSProperties }) {
   const blocks = useMemo(() => parseBlocks(children ?? ""), [children]);
-  return <div className={`markdown ${className ?? ""}`.trim()}>{blocks}</div>;
+  return <div className={`markdown ${className ?? ""}`.trim()} style={style}>{blocks}</div>;
 }
 
 type Node = React.ReactNode;

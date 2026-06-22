@@ -140,6 +140,22 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .article-body { margin: 12px 0; }
 .coords { font-size: 13px; color: var(--text-muted); font-family: monospace; }
 
+/* Article card (newspaper detail) */
+.article-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.article-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
 /* Countdown */
 .countdown { font-weight: 600; color: var(--accent); }
 
@@ -270,4 +286,26 @@ button.btn-reported:hover { background: var(--danger); color: #fff; }
 .markdown-preview-label {
   display: block; font-size: 11px; text-transform: uppercase;
   letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 6px;
+}
+
+/* Live side-by-side markdown editor */
+.live-md-editor {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.live-md-editor textarea {
+  min-height: 300px;
+  resize: vertical;
+}
+.live-md-preview {
+  overflow-y: auto;
+  min-height: 300px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+@media (max-width: 700px) {
+  .live-md-editor { grid-template-columns: 1fr; }
 }
