@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../api/client.js";
+import { api, ApiError } from "../api/client.js";
 import { useI18n } from "../i18n/context.js";
 import type { Event } from "../api/types.js";
 
@@ -17,41 +17,85 @@ function formatCountdown(target: Date): string {
 
 function Countdown({ target }: { target: string }) {
   const [display, setDisplay] = useState(() => formatCountdown(new Date(target)));
-
   useEffect(() => {
     const id = setInterval(() => setDisplay(formatCountdown(new Date(target))), 5000);
     return () => clearInterval(id);
   }, [target]);
-
   return <span className="countdown">{display}</span>;
 }
+
+function ReportButton({ onClick }: { onClick: () => void }) {
+  const { t } = useI18n();
+  return (
+    <button
+      className="btn-small btn-report report-corner"
+      onClick={onClick}
+      title={t("events.report")}
+    >
+      ⚑
+    </button>
+  );
+}
+
+const EMPTY_FORM = { name: "", description: "", startsAt: "", durationMinutes: 60, x: "", y: "", z: "" };
 
 export function EventsPage() {
   const { t } = useI18n();
   const [events, setEvents] = useState<Event[]>([]);
+  const [myPending, setMyPending] = useState<Event[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
-    name: "", description: "", startsAt: "", durationMinutes: 60,
-    x: "", y: "", z: "",
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [errors, setErrors] = useState<Partial<typeof EMPTY_FORM>>({});
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
+  function loadAll() {
     api.get<Event[]>("/api/events").then(setEvents);
-  }, []);
+    api.get<Event[]>("/api/me/events").then(setMyPending);
+  }
+
+  useEffect(() => { loadAll(); }, []);
 
   const systemEvents = events.filter((e) => e.isSystem);
   const regularEvents = events.filter((e) => !e.isSystem);
 
+  function validate() {
+    const e: Partial<typeof EMPTY_FORM> = {};
+    if (!form.name.trim()) e.name = t("error.invalidInput");
+    if (!form.startsAt) e.startsAt = t("error.invalidInput");
+    if (!form.durationMinutes || Number(form.durationMinutes) < 1) e.durationMinutes = t("error.invalidInput");
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   async function requestEvent() {
-    await api.post("/api/events", {
-      ...form,
-      durationMinutes: Number(form.durationMinutes),
-      x: form.x ? Number(form.x) : undefined,
-      y: form.y ? Number(form.y) : undefined,
-      z: form.z ? Number(form.z) : undefined,
-    });
+    if (!validate()) return;
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      await api.post("/api/events", {
+        ...form,
+        durationMinutes: Number(form.durationMinutes),
+        x: form.x ? Number(form.x) : undefined,
+        y: form.y ? Number(form.y) : undefined,
+        z: form.z ? Number(form.z) : undefined,
+      });
+      setShowForm(false);
+      setForm(EMPTY_FORM);
+      setErrors({});
+      loadAll();
+    } catch (err) {
+      setSubmitError(err instanceof ApiError ? err.message : t("common.error"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function cancel() {
     setShowForm(false);
-    setForm({ name: "", description: "", startsAt: "", durationMinutes: 60, x: "", y: "", z: "" });
+    setForm(EMPTY_FORM);
+    setErrors({});
+    setSubmitError("");
   }
 
   return (
@@ -62,22 +106,90 @@ export function EventsPage() {
       </div>
 
       {showForm && (
-        <div className="card">
-          <input placeholder={t("events.name")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <textarea placeholder={t("events.description")} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} />
-          <input type="datetime-local" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} />
-          <input type="number" placeholder={t("events.duration")} value={form.durationMinutes} onChange={(e) => setForm({ ...form, durationMinutes: Number(e.target.value) })} />
-          <div style={{ display: "flex", gap: 8 }}>
-            <input placeholder="X" value={form.x} onChange={(e) => setForm({ ...form, x: e.target.value })} style={{ width: 80 }} />
-            <input placeholder="Y" value={form.y} onChange={(e) => setForm({ ...form, y: e.target.value })} style={{ width: 80 }} />
-            <input placeholder="Z" value={form.z} onChange={(e) => setForm({ ...form, z: e.target.value })} style={{ width: 80 }} />
+        <div className="card form-card">
+          <div className="form-field">
+            <label>Event title *</label>
+            <input
+              placeholder="e.g. Trade fair at spawn"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className={errors.name ? "input-error" : ""}
+            />
+            {errors.name && <span className="field-error">{errors.name}</span>}
           </div>
-          <button onClick={requestEvent}>{t("common.submit")}</button>
-          <button onClick={() => setShowForm(false)}>{t("common.cancel")}</button>
+
+          <div className="form-field">
+            <label>Description</label>
+            <textarea
+              placeholder="What's happening? Where to meet, what to bring…"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              rows={3}
+            />
+          </div>
+
+          <div className="form-row">
+            <div className="form-field" style={{ flex: 2 }}>
+              <label>Date & time *</label>
+              <input
+                type="datetime-local"
+                value={form.startsAt}
+                onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
+                className={errors.startsAt ? "input-error" : ""}
+              />
+              {errors.startsAt && <span className="field-error">{errors.startsAt}</span>}
+            </div>
+            <div className="form-field" style={{ flex: 1 }}>
+              <label>Duration (minutes) *</label>
+              <input
+                type="number"
+                min={1}
+                placeholder="60"
+                value={form.durationMinutes}
+                onChange={(e) => setForm({ ...form, durationMinutes: Number(e.target.value) })}
+                className={errors.durationMinutes ? "input-error" : ""}
+              />
+              {errors.durationMinutes && <span className="field-error">{errors.durationMinutes}</span>}
+            </div>
+          </div>
+
+          <div className="form-field">
+            <label>Coordinates (optional)</label>
+            <div className="form-row">
+              <input placeholder="X" value={form.x} onChange={(e) => setForm({ ...form, x: e.target.value })} />
+              <input placeholder="Y" value={form.y} onChange={(e) => setForm({ ...form, y: e.target.value })} />
+              <input placeholder="Z" value={form.z} onChange={(e) => setForm({ ...form, z: e.target.value })} />
+            </div>
+          </div>
+
+          {submitError && <p className="field-error">{submitError}</p>}
+
+          <div className="form-actions">
+            <button onClick={requestEvent} disabled={submitting}>{t("common.submit")}</button>
+            <button className="btn-secondary" onClick={cancel}>{t("common.cancel")}</button>
+          </div>
         </div>
       )}
 
-      {/* Pinned system events */}
+      {/* My pending submissions */}
+      {myPending.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{ marginBottom: 8, fontSize: 14, color: "var(--text-muted)" }}>Your pending requests</h3>
+          {myPending.map((e) => (
+            <div key={e.id} className="card card-pending">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <strong>{e.name}</strong>
+                <span className="badge badge-pending">Awaiting approval</span>
+              </div>
+              <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                {new Date(e.starts_at).toLocaleString()} · {e.duration_minutes} min
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* System events */}
       {systemEvents.map((e) => (
         <div key={e.id} className="card card-system">
           <h3>⚔ {e.name}</h3>
@@ -86,29 +198,22 @@ export function EventsPage() {
         </div>
       ))}
 
-      {regularEvents.length === 0 && systemEvents.length === 0 && (
-        <p>{t("events.noEvents")}</p>
+      {regularEvents.length === 0 && systemEvents.length === 0 && myPending.length === 0 && (
+        <p style={{ color: "var(--text-muted)" }}>{t("events.noEvents")}</p>
       )}
 
       {regularEvents.map((e) => (
-        <div key={e.id} className="card">
+        <div key={e.id} className="card" style={{ position: "relative" }}>
+          <ReportButton onClick={() => api.post("/api/reports", { targetType: "event", targetId: e.id })} />
           <h3>{e.name}</h3>
           <p>{e.description}</p>
-          <p>
+          <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
             {new Date(e.starts_at).toLocaleString()} · {e.duration_minutes} min
           </p>
           {e.x != null && (
-            <p className="coords">
-              {t("events.coordsLabel", { x: e.x!, y: e.y!, z: e.z! })}
-            </p>
+            <p className="coords">{t("events.coordsLabel", { x: e.x!, y: e.y!, z: e.z! })}</p>
           )}
-          <p><Countdown target={e.starts_at} /></p>
-          <button
-            className="btn-small btn-report"
-            onClick={() => api.post("/api/reports", { targetType: "event", targetId: e.id })}
-          >
-            {t("events.report")}
-          </button>
+          <Countdown target={e.starts_at} />
         </div>
       ))}
     </div>

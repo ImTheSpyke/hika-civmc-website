@@ -3,8 +3,7 @@ import { AuthProvider, useAuth } from "./lib/auth.js";
 import { LanguageProvider } from "./i18n/context.js";
 import { Nav } from "./components/Nav.js";
 import { LoginPage } from "./pages/LoginPage.js";
-import { GlobalNotesPage } from "./pages/GlobalNotesPage.js";
-import { PlayerNotesPage } from "./pages/PlayerNotesPage.js";
+import { NotesPage } from "./pages/NotesPage.js";
 import {
   NewspapersPage,
   NewspaperDetailPage,
@@ -37,8 +36,8 @@ function AppRoutes() {
       <Nav />
       <Routes>
         <Route path="/" element={<Navigate to="/notes" />} />
-        <Route path="/notes" element={<RequireAuth><GlobalNotesPage /></RequireAuth>} />
-        <Route path="/players" element={<RequireAuth><PlayerNotesPage /></RequireAuth>} />
+        <Route path="/notes" element={<RequireAuth><NotesPage /></RequireAuth>} />
+        <Route path="/players" element={<Navigate to="/notes" />} />
         <Route path="/newspapers" element={<RequireAuth><NewspapersPage /></RequireAuth>} />
         <Route path="/newspapers/:id" element={<RequireAuth><NewspaperDetailPage /></RequireAuth>} />
         <Route path="/newspapers/:id/manage" element={<RequireAuth><NewspaperManagePage /></RequireAuth>} />

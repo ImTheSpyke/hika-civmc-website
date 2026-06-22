@@ -25,8 +25,7 @@ export function Nav() {
   return (
     <nav className="nav">
       <div className="nav-links">
-        {navLink("/notes", t("nav.globalNotes"))}
-        {navLink("/players", t("nav.playerNotes"))}
+        {navLink("/notes", t("nav.notes"))}
         {navLink("/newspapers", t("nav.newspapers"))}
         {navLink("/events", t("nav.events"))}
         {user.isAdmin && navLink("/admin", t("nav.admin"))}

@@ -1,23 +1,62 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api/client.js";
+import { api, ApiError } from "../api/client.js";
 import { useI18n } from "../i18n/context.js";
 import type { Article, Newspaper } from "../api/types.js";
+
+const EMPTY_FORM = { name: "", description: "", requestReason: "" };
 
 export function NewspapersPage() {
   const { t } = useI18n();
   const [newspapers, setNewspapers] = useState<Newspaper[]>([]);
+  const [mine, setMine] = useState<Newspaper[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: "", description: "", requestReason: "" });
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [errors, setErrors] = useState<Partial<typeof EMPTY_FORM>>({});
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
+  function loadAll() {
     api.get<Newspaper[]>("/api/newspapers").then(setNewspapers);
-  }, []);
+    api.get<Newspaper[]>("/api/me/newspapers").then(setMine);
+  }
+
+  useEffect(() => { loadAll(); }, []);
+
+  // pending = not yet approved; exclude rejected
+  const myPending = mine.filter((n) => n.status === "pending");
+  const myApproved = mine.filter((n) => n.status === "approved");
+
+  function validate() {
+    const e: Partial<typeof EMPTY_FORM> = {};
+    if (!form.name.trim()) e.name = t("error.invalidInput");
+    if (!form.requestReason.trim()) e.requestReason = t("error.invalidInput");
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
 
   async function submitRequest() {
-    await api.post("/api/newspapers", form);
+    if (!validate()) return;
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      await api.post("/api/newspapers", form);
+      setShowForm(false);
+      setForm(EMPTY_FORM);
+      setErrors({});
+      loadAll();
+    } catch (err) {
+      setSubmitError(err instanceof ApiError ? err.message : t("common.error"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function cancel() {
     setShowForm(false);
-    setForm({ name: "", description: "", requestReason: "" });
+    setForm(EMPTY_FORM);
+    setErrors({});
+    setSubmitError("");
   }
 
   return (
@@ -28,57 +67,90 @@ export function NewspapersPage() {
       </div>
 
       {showForm && (
-        <div className="card">
-          <input
-            placeholder={t("newspapers.articleTitle")}
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
-          <textarea
-            placeholder={t("newspapers.requestReason")}
-            value={form.requestReason}
-            onChange={(e) => setForm({ ...form, requestReason: e.target.value })}
-            rows={4}
-          />
-          <button onClick={submitRequest}>{t("common.submit")}</button>
-          <button onClick={() => setShowForm(false)}>{t("common.cancel")}</button>
+        <div className="card form-card">
+          <div className="form-field">
+            <label>Newspaper title *</label>
+            <input
+              placeholder="e.g. The Imperial Gazette"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className={errors.name ? "input-error" : ""}
+            />
+            {errors.name && <span className="field-error">{errors.name}</span>}
+          </div>
+
+          <div className="form-field">
+            <label>Description</label>
+            <textarea
+              placeholder="What will your newspaper cover?"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              rows={2}
+            />
+          </div>
+
+          <div className="form-field">
+            <label>Why do you want to create a newspaper? *</label>
+            <textarea
+              placeholder="Tell the admin your plans and intentions…"
+              value={form.requestReason}
+              onChange={(e) => setForm({ ...form, requestReason: e.target.value })}
+              rows={3}
+              className={errors.requestReason ? "input-error" : ""}
+            />
+            {errors.requestReason && <span className="field-error">{errors.requestReason}</span>}
+          </div>
+
+          {submitError && <p className="field-error">{submitError}</p>}
+
+          <div className="form-actions">
+            <button onClick={submitRequest} disabled={submitting}>{t("common.submit")}</button>
+            <button className="btn-secondary" onClick={cancel}>{t("common.cancel")}</button>
+          </div>
         </div>
       )}
 
-      {newspapers.length === 0 && <p>{t("newspapers.noNewspapers")}</p>}
+      {/* My pending requests */}
+      {myPending.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{ marginBottom: 8, fontSize: 14, color: "var(--text-muted)" }}>Your pending requests</h3>
+          {myPending.map((np) => (
+            <div key={np.id} className="card card-pending">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <strong>{np.name}</strong>
+                <span className="badge badge-pending">Awaiting approval</span>
+              </div>
+              {np.description && <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{np.description}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* My approved newspapers */}
+      {myApproved.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{ marginBottom: 8 }}>{t("newspapers.myNewspapers")}</h3>
+          <ul className="card-list">
+            {myApproved.map((np) => (
+              <li key={np.id} className="card">
+                <Link to={`/newspapers/${np.id}/manage`}>
+                  <strong>{np.name}</strong> <span className="badge">{t("newspapers.approved")}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Public approved newspapers */}
+      <h3 style={{ marginBottom: 8 }}>{t("newspapers.title")}</h3>
+      {newspapers.length === 0 && <p style={{ color: "var(--text-muted)" }}>{t("newspapers.noNewspapers")}</p>}
       <ul className="card-list">
         {newspapers.map((np) => (
           <li key={np.id} className="card">
             <Link to={`/newspapers/${np.id}`}>
               <h3>{np.name}</h3>
               <p>{np.description}</p>
-            </Link>
-          </li>
-        ))}
-      </ul>
-
-      <MyNewspapers t={t} />
-    </div>
-  );
-}
-
-function MyNewspapers({ t }: { t: (k: string) => string }) {
-  const [mine, setMine] = useState<Newspaper[]>([]);
-
-  useEffect(() => {
-    api.get<Newspaper[]>("/api/me/newspapers").then(setMine);
-  }, []);
-
-  if (!mine.length) return null;
-
-  return (
-    <div>
-      <h3>{t("newspapers.myNewspapers")}</h3>
-      <ul className="card-list">
-        {mine.map((np) => (
-          <li key={np.id} className="card">
-            <Link to={`/newspapers/${np.id}/manage`}>
-              {np.name} — <span className="badge">{t(`newspapers.${np.status}`)}</span>
             </Link>
           </li>
         ))}
@@ -104,21 +176,22 @@ export function NewspaperDetailPage() {
 
   return (
     <div className="page">
-      <h2>{data.name}</h2>
-      <p>{data.description}</p>
-      <button className="btn-small btn-report" onClick={report}>{t("newspapers.report")}</button>
-      <hr />
+      <div style={{ position: "relative" }}>
+        <h2>{data.name}</h2>
+        <p>{data.description}</p>
+        <button className="btn-small btn-report report-corner" onClick={report} title={t("newspapers.report")}>⚑</button>
+      </div>
+      <hr style={{ borderColor: "var(--border)", margin: "16px 0" }} />
       {data.articles.map((a) => (
-        <article key={a.id} className="article">
+        <article key={a.id} className="article" style={{ position: "relative" }}>
           <h3>{a.title}</h3>
           <p className="article-date">{new Date(a.published_at).toLocaleDateString()}</p>
           <div className="article-body">{a.body}</div>
           <button
-            className="btn-small btn-report"
+            className="btn-small btn-report report-corner"
             onClick={() => api.post("/api/reports", { targetType: "article", targetId: a.id })}
-          >
-            {t("newspapers.report")}
-          </button>
+            title={t("newspapers.report")}
+          >⚑</button>
         </article>
       ))}
     </div>
