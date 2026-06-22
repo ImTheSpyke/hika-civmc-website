@@ -165,6 +165,13 @@
   "profile.cancelChangeRequest": "Cancel request",
   "profile.changeWarningCaseSensitive": "Case sensitive — type it exactly.",
   "profile.changeWarningSupport": "Username changes require admin approval. You cannot change it yourself.",
+  "profile.dangerZone": "Danger Zone",
+  "profile.deleteAccount": "Permanently delete my account",
+  "profile.deleteAccountDesc": "This will permanently delete your account, notes, tags, and newspapers. This action cannot be undone.",
+  "profile.deleteAccountWarning": "This action is permanent and cannot be undone.",
+  "profile.deleteAccountConfirmDesc": "All your notes, tags, and newspapers will be deleted. Type DELETE to confirm.",
+  "profile.deleteAccountTypeConfirm": "Type \"{word}\" to confirm",
+  "profile.deleteAccountConfirm": "Yes, permanently delete my account",
 
   "onboarding.title": "Set your Minecraft username",
   "onboarding.intro": "Before you continue, tell us your in-game Minecraft username so other players can find you.",

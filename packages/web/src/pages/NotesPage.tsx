@@ -85,21 +85,26 @@ function scoreUser(q: string, u: UserResult): number {
 
 function TagChip({
   tag,
-  onClick,
-  title,
+  onRemove,
 }: {
   tag: Tag;
-  onClick?: () => void;
-  title?: string;
+  onRemove?: () => void;
 }) {
   return (
     <span
       className="player-tag-chip"
       style={{ "--chip-color": tag.color } as React.CSSProperties}
-      onClick={onClick}
-      title={title}
     >
-      {tag.name}{onClick ? " ×" : ""}
+      {tag.name}
+      {onRemove && (
+        <span
+          className="tag-chip-remove"
+          onClick={onRemove}
+          title="Remove"
+          role="button"
+          aria-label={`Remove tag ${tag.name}`}
+        >×</span>
+      )}
     </span>
   );
 }
@@ -459,8 +464,7 @@ function EditorPanel({
             <TagChip
               key={tag.id}
               tag={tag}
-              onClick={() => onDetachTag(tag)}
-              title={t("tags.detach")}
+              onRemove={() => onDetachTag(tag)}
             />
           ))}
           {playerTags.length < MAX_PLAYER_TAGS && available.length > 0 && (

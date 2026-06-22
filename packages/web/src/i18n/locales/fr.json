@@ -164,6 +164,13 @@
   "profile.cancelChangeRequest": "Annuler la demande",
   "profile.changeWarningCaseSensitive": "Sensible à la casse — saisissez exactement le nom.",
   "profile.changeWarningSupport": "Les changements de pseudo nécessitent une validation admin. Vous ne pouvez pas le modifier vous-même.",
+  "profile.dangerZone": "Zone dangereuse",
+  "profile.deleteAccount": "Supprimer définitivement mon compte",
+  "profile.deleteAccountDesc": "Ceci supprimera définitivement votre compte, vos notes, tags et journaux. Cette action est irréversible.",
+  "profile.deleteAccountWarning": "Cette action est permanente et irréversible.",
+  "profile.deleteAccountConfirmDesc": "Toutes vos notes, tags et journaux seront supprimés. Tapez SUPPRIMER pour confirmer.",
+  "profile.deleteAccountTypeConfirm": "Tapez \"{word}\" pour confirmer",
+  "profile.deleteAccountConfirm": "Oui, supprimer définitivement mon compte",
 
   "onboarding.title": "Définissez votre pseudo Minecraft",
   "onboarding.intro": "Avant de continuer, indiquez votre pseudo Minecraft pour que les autres joueurs puissent vous trouver.",

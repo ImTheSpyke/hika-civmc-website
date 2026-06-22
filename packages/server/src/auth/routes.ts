@@ -80,7 +80,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         global_name?: string;
       };
 
-      // Upsert user
+      // Upsert user. If a tombstone row exists (status='deleted') from a prior
+      // self-deletion, resurrect it as a fresh pending account so the same Discord
+      // account can re-register without violating the UNIQUE discord_id constraint.
       const displayName = profile.global_name ?? profile.username;
       await query(
         `INSERT INTO users (discord_id, discord_username, discord_display_name)
@@ -88,6 +90,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
          ON DUPLICATE KEY UPDATE
            discord_username = VALUES(discord_username),
            discord_display_name = VALUES(discord_display_name),
+           status = IF(status = 'deleted', 'pending', status),
            last_seen_at = NOW()`,
         [profile.id, profile.username, displayName]
       );
@@ -98,7 +101,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       );
       const user = rows[0];
 
-      // Log new user creation (only if just inserted — status defaults to pending)
+      // Treat a just-resurrected tombstone the same as a brand new account
       const isNew = user.status === "pending";
       if (isNew) {
         await adminLog(null, "user.create", "user", user.id, { discordId: profile.id });

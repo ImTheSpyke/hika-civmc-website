@@ -113,6 +113,48 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({ ok: true });
   });
 
+  // Permanently delete the caller's account.
+  // Leaves a tombstone row (same id + discord_id, status='deleted', all personal
+  // data wiped) so: the numeric id is never reused, admin_log entries remain
+  // intact, and the same Discord account can re-register by updating the tombstone.
+  app.delete("/api/me", { preHandler: requireAuth }, async (req, reply) => {
+    const userId = req.sessionUser!.id;
+
+    // Release player-note backfill link before wiping mc_username
+    await releaseUsername(userId);
+
+    // Wipe all user-owned data that is not kept for integrity / logs
+    await query("DELETE FROM sessions WHERE user_id = ?", [userId]);
+    await query("DELETE FROM global_notes WHERE user_id = ?", [userId]);
+    await query("DELETE FROM player_notes WHERE author_id = ?", [userId]);
+    await query("DELETE FROM tags WHERE owner_id = ?", [userId]);
+    await query("DELETE FROM username_change_requests WHERE user_id = ?", [userId]);
+    await query("DELETE FROM newspaper_subscriptions WHERE user_id = ?", [userId]);
+    // Newspapers owned by the user: cascade deletes articles + reports via FK
+    await query("DELETE FROM newspapers WHERE owner_id = ?", [userId]);
+    await query("DELETE FROM reports WHERE reporter_id = ?", [userId]);
+
+    // Convert the user row to a tombstone: preserve id + discord_id only
+    await query(
+      `UPDATE users SET
+         discord_username = '',
+         discord_display_name = '',
+         mc_username = NULL,
+         mc_verified = FALSE,
+         status = 'deleted',
+         is_admin = FALSE,
+         public_faction_tag = NULL,
+         last_report_at = NULL
+       WHERE id = ?`,
+      [userId]
+    );
+
+    await adminLog(userId, "user.delete_self", "user", userId);
+
+    reply.clearCookie("session");
+    return reply.send({ ok: true });
+  });
+
   // Request verification
   app.post(
     "/api/me/verify-request",

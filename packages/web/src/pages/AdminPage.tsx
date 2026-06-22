@@ -261,6 +261,7 @@ const ACTION_META: Record<string, { label: string; color: string }> = {
   "user.approve":        { label: "approved",    color: "#2a7a2a" },
   "user.reject":         { label: "rejected",    color: "#8c2a2a" },
   "user.delete":         { label: "user×",       color: "#8c2a2a" },
+  "user.delete_self":    { label: "self-del",    color: "#8c2a2a" },
   "user.username_set":   { label: "mc-set",      color: "#5865f2" },
   "user.username_change_request": { label: "mc-req",  color: "#888" },
   "user.username_change_approve": { label: "mc-name+", color: "#2a7a2a" },
