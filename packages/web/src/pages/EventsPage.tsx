@@ -37,7 +37,7 @@ function ReportButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-const EMPTY_FORM = { name: "", description: "", startsAt: "", durationMinutes: 60, x: "", y: "", z: "" };
+const EMPTY_FORM = { name: "", description: "", startsAt: "", durationMinutes: "60", x: "", y: "", z: "" };
 
 export function EventsPage() {
   const { t } = useI18n();
@@ -146,7 +146,7 @@ export function EventsPage() {
                 min={1}
                 placeholder="60"
                 value={form.durationMinutes}
-                onChange={(e) => setForm({ ...form, durationMinutes: Number(e.target.value) })}
+                onChange={(e) => setForm({ ...form, durationMinutes: String(Number(e.target.value)) })}
                 className={errors.durationMinutes ? "input-error" : ""}
               />
               {errors.durationMinutes && <span className="field-error">{errors.durationMinutes}</span>}
