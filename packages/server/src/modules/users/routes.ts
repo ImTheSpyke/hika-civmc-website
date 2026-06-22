@@ -2,7 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { requireAuth } from "../../auth/session.js";
 import { query } from "../../db.js";
 import { adminLog } from "../admin/service.js";
-import { backfillUsername } from "./service.js";
+import { getSetting } from "../admin/settings.js";
+import { backfillUsername, releaseUsername } from "./service.js";
 import type { RowDataPacket } from "mysql2";
 
 export async function usersRoutes(app: FastifyInstance): Promise<void> {
@@ -85,8 +86,21 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
         "INSERT INTO username_change_requests (user_id, requested_mc_username, reason) VALUES (?, ?, ?)",
         [userId, mcUsername, req.body?.reason ?? ""]
       );
+      const reqId = (result as any).insertId;
       await adminLog(userId, "user.username_change_request", "user", userId, { mcUsername });
-      return reply.code(201).send({ id: (result as any).insertId });
+
+      if (await getSetting("auto_approve_username_changes")) {
+        await releaseUsername(userId);
+        await query("UPDATE users SET mc_username = ?, mc_verified = FALSE WHERE id = ?", [mcUsername, userId]);
+        await backfillUsername(mcUsername, userId);
+        await query(
+          "UPDATE username_change_requests SET status = 'approved', resolved_at = NOW() WHERE id = ?",
+          [reqId]
+        );
+        await adminLog(null, "user.username_change_approve", "user", userId, { mcUsername, auto: true });
+      }
+
+      return reply.code(201).send({ id: reqId });
     }
   );
 

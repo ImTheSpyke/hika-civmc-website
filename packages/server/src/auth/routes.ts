@@ -3,6 +3,8 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { query } from "../db.js";
 import { config } from "../config.js";
 import { adminLog } from "../modules/admin/service.js";
+import { getSetting } from "../modules/admin/settings.js";
+import { backfillUsername } from "../modules/users/service.js";
 import type { RowDataPacket } from "mysql2";
 
 const DISCORD_API = "https://discord.com/api/v10";
@@ -109,6 +111,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           "UPDATE users SET status = 'approved', is_admin = TRUE WHERE id = ?",
           [user.id]
         );
+      } else if (isNew && await getSetting("auto_approve_accounts")) {
+        await query("UPDATE users SET status = 'approved' WHERE id = ?", [user.id]);
+        await adminLog(null, "user.approve", "user", user.id, { auto: true });
       }
 
       // Create session (30-day expiry)

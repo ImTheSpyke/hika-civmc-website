@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { requireAdmin, requireAuth } from "../../auth/session.js";
 import { query } from "../../db.js";
 import { adminLog } from "./service.js";
+import { getAllSettings, setSetting, type SettingKey } from "./settings.js";
 import { backfillUsername, releaseUsername } from "../users/service.js";
 import type { RowDataPacket } from "mysql2";
 
@@ -352,6 +353,26 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       await query("DELETE FROM events WHERE id = ?", [id]);
       await adminLog(req.sessionUser!.id, "moderation.remove", "event", id);
       return reply.send({ ok: true });
+    }
+  );
+
+  // --- Site settings ---
+  app.get("/api/admin/settings", { preHandler: requireAdmin }, async (_req, reply) => {
+    return reply.send(await getAllSettings());
+  });
+
+  app.patch<{ Body: Record<string, boolean> }>(
+    "/api/admin/settings",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const allowed: SettingKey[] = ["auto_approve_accounts", "auto_approve_username_changes", "auto_approve_newspapers"];
+      for (const key of allowed) {
+        if (typeof req.body[key] === "boolean") {
+          await setSetting(key, req.body[key]);
+          await adminLog(req.sessionUser!.id, "settings.update", undefined, undefined, { key, value: req.body[key] });
+        }
+      }
+      return reply.send(await getAllSettings());
     }
   );
 
