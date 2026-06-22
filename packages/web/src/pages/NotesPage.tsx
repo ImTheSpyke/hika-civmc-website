@@ -8,8 +8,70 @@ import { MarkdownEditor } from "../components/MarkdownEditor.js";
 const NOTE_MAX = 5000;
 const DEBOUNCE_MS = 1500;
 const MAX_PLAYER_TAGS = 10;
+const SEARCH_THRESHOLD = 0.8;
+const SEARCH_LIMIT = 10;
 
 type SortKey = "updated" | "username" | "tag";
+
+// ── fuzzy string similarity ──────────────────
+
+function compareString(string1: string, string2: string): number {
+  if (string1 === string2) return 1;
+  if (string1 === "" || string2 === "") return 0;
+  let total_count = 0;
+  let ok_count = 0;
+  for (let longueur_test = 1; longueur_test < string1.length + 1; longueur_test++) {
+    for (let multiplier = 0; multiplier < (string1.length / longueur_test) + 1; multiplier++) {
+      const index = longueur_test * multiplier;
+      if (string1.length > index) {
+        total_count++;
+        const the_string = string1.substr(index, longueur_test);
+        if (string2.indexOf(the_string) !== -1) {
+          ok_count += 0.5;
+        } else if (string2.toLowerCase().indexOf(the_string) !== -1) {
+          ok_count += 0.45;
+        } else if (string2.indexOf(the_string.toLowerCase()) !== -1) {
+          ok_count += 0.45;
+        }
+      }
+      if (string2.length > index) {
+        const the_string = string2.substr(index, longueur_test);
+        if (string1.indexOf(the_string) !== -1) {
+          ok_count += 0.5;
+        } else if (string1.toLowerCase().indexOf(the_string) !== -1) {
+          ok_count += 0.45;
+        } else if (string1.indexOf(the_string.toLowerCase()) !== -1) {
+          ok_count += 0.45;
+        }
+      }
+    }
+  }
+  const a = string1.length;
+  const b = string2.length;
+  const ponderation = b / a === 1 ? 1 : b / a > 1 ? a / b : b / a;
+  return (ok_count / total_count) * ponderation;
+}
+
+function scoreUser(q: string, u: UserResult): number {
+  const lq = q.toLowerCase();
+  // Score against each searchable field, take the best
+  const fields = [
+    u.mcUsername ?? "",
+    u.discordUsername,
+    u.discordDisplayName,
+  ];
+  let best = 0;
+  for (const field of fields) {
+    if (!field) continue;
+    const lf = field.toLowerCase();
+    // Exact prefix gets a boost over the fuzzy score
+    let s = compareString(lq, lf);
+    if (lf.startsWith(lq)) s = Math.max(s, 0.95);
+    if (lf === lq) s = 1;
+    if (s > best) best = s;
+  }
+  return best;
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -431,6 +493,8 @@ export function NotesPage() {
   const [notes, setNotes] = useState<PlayerNote[]>([]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [tagMap, setTagMap] = useState<Record<string, Tag[]>>({});
+  // All approved users, loaded once for instant client-side search
+  const allUsers = useRef<UserResult[]>([]);
 
   // UI state
   const [selected, setSelected] = useState<string | null>(null);
@@ -445,15 +509,19 @@ export function NotesPage() {
   const [sort, setSort] = useState<SortKey>("updated");
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
 
   // ── load all notes + tags ──────────────────────────────────────────────────
 
   async function loadData() {
-    const [fetchedNotes, fetchedTags] = await Promise.all([
+    const [fetchedNotes, fetchedTags, fetchedUsers] = await Promise.all([
       api.get<PlayerNote[]>("/api/player-notes"),
       api.get<Tag[]>("/api/tags"),
+      allUsers.current.length === 0
+        ? api.get<UserResult[]>("/api/users/all")
+        : Promise.resolve(allUsers.current),
     ]);
+    if (fetchedUsers !== allUsers.current) allUsers.current = fetchedUsers;
     setNotes(fetchedNotes);
     setAllTags(fetchedTags);
 
@@ -505,17 +573,21 @@ export function NotesPage() {
       return db.localeCompare(da);
     });
 
-  // ── search ────────────────────────────────────────────────────────────────
+  // ── search (instant, client-side) ────────────────────────────────────────
 
   function handleSearch(q: string) {
     setSearch(q);
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (!q.trim()) { setSearchResults([]); return; }
-    searchTimer.current = setTimeout(async () => {
-      setSearchResults(
-        await api.get<UserResult[]>(`/api/users/search?q=${encodeURIComponent(q)}`)
-      );
-    }, 300);
+    const trimmed = q.trim();
+    if (!trimmed) { setSearchResults([]); return; }
+
+    const scored = allUsers.current
+      .map((u) => ({ u, score: scoreUser(trimmed, u) }))
+      .filter(({ score }) => score >= SEARCH_THRESHOLD)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, SEARCH_LIMIT)
+      .map(({ u }) => u);
+
+    setSearchResults(scored);
   }
 
   // ── select / load a player ────────────────────────────────────────────────

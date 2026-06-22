@@ -127,7 +127,7 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
-  // Search approved users
+  // Search approved users (kept for backwards compat)
   app.get<{ Querystring: { q: string } }>(
     "/api/users/search",
     { preHandler: requireAuth },
@@ -144,6 +144,27 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
          LIMIT 20`,
         [like, like, like]
       );
+      return reply.send(
+        rows.map((r) => ({
+          ...r,
+          mcVerified: Boolean(r.mcVerified),
+          avatarUrl: r.mcUsername ? `/api/avatars/${encodeURIComponent(r.mcUsername)}` : null,
+        }))
+      );
+    }
+  );
+
+  // Full approved user list for client-side instant search (~1000 rows max)
+  app.get(
+    "/api/users/all",
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const [rows] = await query<RowDataPacket[]>(
+        `SELECT id as userId, discord_username as discordUsername, discord_display_name as discordDisplayName,
+                mc_username as mcUsername, mc_verified as mcVerified, public_faction_tag as publicFactionTag
+         FROM users WHERE status = 'approved' ORDER BY mc_username ASC`
+      );
+      reply.header("Cache-Control", "private, max-age=60");
       return reply.send(
         rows.map((r) => ({
           ...r,
