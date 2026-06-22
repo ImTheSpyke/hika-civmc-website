@@ -9,6 +9,7 @@ const NOTE_MAX = 5000;
 const DEBOUNCE_MS = 1500;
 const MAX_PLAYER_TAGS = 10;
 const SEARCH_THRESHOLD = 0.8;
+const SEARCH_MIN = 5;
 const SEARCH_LIMIT = 10;
 
 type SortKey = "updated" | "username" | "tag";
@@ -54,7 +55,6 @@ function compareString(string1: string, string2: string): number {
 
 function scoreUser(q: string, u: UserResult): number {
   const lq = q.toLowerCase();
-  // Score against each searchable field, take the best
   const fields = [
     u.mcUsername ?? "",
     u.discordUsername,
@@ -64,10 +64,18 @@ function scoreUser(q: string, u: UserResult): number {
   for (const field of fields) {
     if (!field) continue;
     const lf = field.toLowerCase();
-    // Exact prefix gets a boost over the fuzzy score
+    // Score the query against the full field AND against every contiguous
+    // substring of the field that is the same length as the query.
+    // This lets "aimthespyke" match "imthespyke" even though the first
+    // character differs — compareString will find "imthespyke" inside
+    // the query as a high-scoring substring window.
     let s = compareString(lq, lf);
-    if (lf.startsWith(lq)) s = Math.max(s, 0.95);
-    if (lf === lq) s = 1;
+    const wlen = lq.length;
+    for (let i = 0; i <= lf.length - wlen; i++) {
+      const window = lf.slice(i, i + wlen);
+      const ws = compareString(lq, window);
+      if (ws > s) s = ws;
+    }
     if (s > best) best = s;
   }
   return best;
@@ -590,14 +598,16 @@ export function NotesPage() {
     const trimmed = q.trim();
     if (!trimmed) { setSearchResults([]); return; }
 
-    const scored = allUsers.current
+    const all = allUsers.current
       .map((u) => ({ u, score: scoreUser(trimmed, u) }))
-      .filter(({ score }) => score >= SEARCH_THRESHOLD)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, SEARCH_LIMIT)
-      .map(({ u }) => u);
+      .sort((a, b) => b.score - a.score);
 
-    setSearchResults(scored);
+    const above = all.filter(({ score }) => score >= SEARCH_THRESHOLD);
+    const results = above.length >= SEARCH_MIN
+      ? above.slice(0, SEARCH_LIMIT)
+      : all.slice(0, SEARCH_MIN);
+
+    setSearchResults(results.map(({ u }) => u));
   }
 
   // ── select / load a player ────────────────────────────────────────────────
