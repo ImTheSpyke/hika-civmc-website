@@ -103,13 +103,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       }
       await adminLog(user.id, "user.connect");
 
-      // Bootstrap super-admin
-      if (
-        config.superadminDiscordId &&
-        profile.id === config.superadminDiscordId &&
-        !user.is_admin
-      ) {
-        await query("UPDATE users SET is_admin = TRUE WHERE id = ?", [user.id]);
+      // Bootstrap super-admin: auto-approve and grant admin on first login
+      if (config.superadminDiscordId && profile.id === config.superadminDiscordId) {
+        await query(
+          "UPDATE users SET status = 'approved', is_admin = TRUE WHERE id = ?",
+          [user.id]
+        );
       }
 
       // Create session (30-day expiry)
@@ -132,13 +131,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
-  // Logout
+  // Logout — POST only (GET logout is a CSRF vector)
+  // addContentTypeParser covers form submissions from the pending/rejected page
+  app.addContentTypeParser("application/x-www-form-urlencoded", (_req, _payload, done) => done(null, {}));
   app.post("/api/auth/logout", async (req, reply) => {
     const token = (req.cookies as Record<string, string>)["session"];
     if (token) {
       await query("DELETE FROM sessions WHERE id = ?", [token]);
     }
     reply.clearCookie("session", { path: "/" });
-    return reply.send({ ok: true });
+    return reply.redirect("/");
   });
 }

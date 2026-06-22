@@ -25,8 +25,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function logout() {
-    await api.post("/api/auth/logout");
+    await fetch("/api/auth/logout", { method: "POST", redirect: "manual" });
     setUser(null);
+    window.location.href = "/";
   }
 
   useEffect(() => {

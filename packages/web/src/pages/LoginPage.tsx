@@ -1,6 +1,14 @@
 import { useI18n } from "../i18n/context.js";
 import { useAuth } from "../lib/auth.js";
 
+function LogoutButton({ label }: { label: string }) {
+  return (
+    <form method="post" action="/api/auth/logout">
+      <button type="submit">{label}</button>
+    </form>
+  );
+}
+
 export function LoginPage() {
   const { t } = useI18n();
   const { user } = useAuth();
@@ -9,7 +17,7 @@ export function LoginPage() {
     return (
       <div className="page-center">
         <p>{t("auth.pending")}</p>
-        <a href="/api/auth/logout">Logout</a>
+        <LogoutButton label={t("nav.logout")} />
       </div>
     );
   }
@@ -18,7 +26,7 @@ export function LoginPage() {
     return (
       <div className="page-center">
         <p>{t("auth.rejected")}</p>
-        <a href="/api/auth/logout">Logout</a>
+        <LogoutButton label={t("nav.logout")} />
       </div>
     );
   }

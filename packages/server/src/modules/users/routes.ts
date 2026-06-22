@@ -6,9 +6,12 @@ import { backfillUsername } from "./service.js";
 import type { RowDataPacket } from "mysql2";
 
 export async function usersRoutes(app: FastifyInstance): Promise<void> {
-  // Current user profile
-  app.get("/api/me", { preHandler: requireAuth }, async (req, reply) => {
-    const u = req.sessionUser!;
+  // Current user profile — available to all authenticated users including pending
+  app.get("/api/me", async (req, reply) => {
+    if (!req.sessionUser) {
+      return reply.code(401).send({ error: { code: "error.unauthorized", message: "Not logged in" } });
+    }
+    const u = req.sessionUser!
     return reply.send({
       id: u.id,
       discordUsername: u.discordUsername,
