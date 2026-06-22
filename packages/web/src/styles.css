@@ -168,7 +168,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .notes-tag-filter-clear { background: transparent; border: none; color: var(--text-muted); font-size: 11px; padding: 0; text-align: left; text-decoration: underline; }
 .notes-tag-filter-clear:hover { color: var(--danger); background: transparent; }
 .notes-tag-filter-chips { display: flex; flex-wrap: wrap; gap: 5px; }
-.player-tag-chip.chip-active { opacity: 1; box-shadow: 0 0 0 2px color-mix(in srgb, var(--chip-color, var(--accent)) 60%, transparent); }
+/* In the filter panel, chips start with border-only; selected ones fill in */
+.player-tag-chip.chip-filter { background: transparent; }
+.player-tag-chip.chip-filter:hover { opacity: 1; background: color-mix(in srgb, var(--chip-color, var(--accent)) 10%, transparent); }
+.player-tag-chip.chip-active { background: color-mix(in srgb, var(--chip-color, var(--accent)) 30%, transparent); }
 
 /* Delete confirmation inline */
 .notes-delete-confirm {

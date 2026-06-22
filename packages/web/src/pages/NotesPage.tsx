@@ -341,7 +341,7 @@ function Sidebar({
               return (
                 <span
                   key={tag.id}
-                  className={`player-tag-chip${active ? " chip-active" : ""}`}
+                  className={`player-tag-chip chip-filter${active ? " chip-active" : ""}`}
                   style={{ "--chip-color": tag.color } as React.CSSProperties}
                   onClick={() => onToggleFilterTag(tag.id)}
                 >
