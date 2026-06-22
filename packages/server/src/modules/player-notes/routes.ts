@@ -51,6 +51,23 @@ export async function playerNotesRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
+  // List tags assigned to a specific player by the current user
+  // Must be registered before /:username to avoid route collision.
+  app.get<{ Params: { username: string } }>(
+    "/api/player-notes/:username/tags",
+    { preHandler: requireOnboarded },
+    async (req, reply) => {
+      const [rows] = await query<RowDataPacket[]>(
+        `SELECT pt.tag_id as tagId
+         FROM player_tags pt
+         JOIN tags t ON t.id = pt.tag_id
+         WHERE pt.target_mc_username = ? AND t.owner_id = ?`,
+        [req.params.username, req.sessionUser!.id]
+      );
+      return reply.send(rows);
+    }
+  );
+
   // Get a single note
   app.get<{ Params: { username: string } }>(
     "/api/player-notes/:username",

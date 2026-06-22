@@ -3,10 +3,11 @@ import { api } from "../api/client.js";
 import { useI18n } from "../i18n/context.js";
 import type { PlayerNote, Tag, UserResult } from "../api/types.js";
 import { Avatar } from "../components/Avatar.js";
-import { Markdown } from "../components/Markdown.js";
+import { MarkdownEditor } from "../components/MarkdownEditor.js";
 
 const MAX = 5000;
 const DEBOUNCE_MS = 2000;
+const MAX_PLAYER_TAGS = 10;
 
 type ActiveTab = "global" | "players";
 
@@ -38,8 +39,7 @@ function GlobalNotes() {
     }
   }
 
-  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    const val = e.target.value;
+  function handleChange(val: string) {
     if (val.length > MAX) return;
     setBody(val);
     setStatus("idle");
@@ -48,29 +48,19 @@ function GlobalNotes() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div className="live-md-editor">
-        <textarea
-          value={body}
-          onChange={handleChange}
-          onBlur={() => { if (timerRef.current) clearTimeout(timerRef.current); save(body); }}
-          placeholder={t("globalNotes.placeholder")}
-          style={{ flex: 1, width: "100%", resize: "none", minHeight: 400 }}
-        />
-        <div className="live-md-preview markdown markdown-note">
-          {body.trim()
-            ? <Markdown>{body}</Markdown>
-            : <p style={{ color: "var(--text-muted)", margin: 0 }}>{t("globalNotes.placeholder")}</p>}
-        </div>
-      </div>
-      <div className="notes-footer">
-        <span>{t("globalNotes.chars", { count: body.length, max: MAX })}</span>
-        <span>
-          {status === "saving" && t("common.saving")}
-          {status === "saved" && t("common.saved")}
-        </span>
-      </div>
-    </div>
+    <MarkdownEditor
+      value={body}
+      onChange={handleChange}
+      onBlur={() => { if (timerRef.current) clearTimeout(timerRef.current); save(body); }}
+      placeholder={t("globalNotes.placeholder")}
+      maxLength={MAX}
+      minHeight={400}
+      statusLeft={t("globalNotes.chars", { count: body.length, max: MAX })}
+      statusRight={
+        status === "saving" ? t("common.saving") :
+        status === "saved"  ? t("common.saved")  : undefined
+      }
+    />
   );
 }
 
@@ -79,24 +69,41 @@ function GlobalNotes() {
 function PlayerNotes() {
   const { t } = useI18n();
   const [notes, setNotes] = useState<PlayerNote[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
   const [filterTag, setFilterTag] = useState("");
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<UserResult[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [noteBody, setNoteBody] = useState("");
   const [rawUsername, setRawUsername] = useState("");
+  // Tags assigned to the currently selected player
+  const [playerTags, setPlayerTags] = useState<Tag[]>([]);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     loadNotes();
-    api.get<Tag[]>("/api/tags").then(setTags);
+    api.get<Tag[]>("/api/tags").then(setAllTags);
   }, [filterTag]);
 
   async function loadNotes() {
     const qs = filterTag ? `?tag=${filterTag}` : "";
     setNotes(await api.get<PlayerNote[]>(`/api/player-notes${qs}`));
+  }
+
+  async function loadPlayerTags(username: string) {
+    // Fetch which of the user's tags are assigned to this player.
+    // We ask each tag's player list — simpler: fetch all tag assignments
+    // by querying the dedicated endpoint for each tag that has this player.
+    // Better: fetch players-by-tag for all tags and cross-reference.
+    // We do it client-side: ask /api/tags/:id/assign-check isn't an endpoint,
+    // so we load all tags with their players via a single call to the player's
+    // tag list endpoint that we add here.
+    const data = await api.get<{ tagId: number }[]>(
+      `/api/player-notes/${encodeURIComponent(username)}/tags`
+    );
+    const assignedIds = new Set(data.map((d) => d.tagId));
+    setPlayerTags(allTags.filter((t) => assignedIds.has(t.id)));
   }
 
   function handleSearch(q: string) {
@@ -118,6 +125,7 @@ function PlayerNotes() {
     } catch {
       setNoteBody("");
     }
+    await loadPlayerTags(mcUsername);
   }
 
   function handleNoteChange(val: string) {
@@ -134,7 +142,7 @@ function PlayerNotes() {
 
   async function deleteNote(username: string) {
     await api.delete(`/api/player-notes/${encodeURIComponent(username)}`);
-    if (selected === username) { setSelected(null); setNoteBody(""); }
+    if (selected === username) { setSelected(null); setNoteBody(""); setPlayerTags([]); }
     await loadNotes();
   }
 
@@ -143,6 +151,21 @@ function PlayerNotes() {
     await selectPlayer(rawUsername.trim());
     setRawUsername("");
   }
+
+  async function assignTag(tag: Tag) {
+    if (!selected) return;
+    await api.post(`/api/tags/${tag.id}/assign`, { username: selected });
+    setPlayerTags((prev) => [...prev, tag]);
+  }
+
+  async function detachTag(tag: Tag) {
+    if (!selected) return;
+    await api.delete(`/api/tags/${tag.id}/assign/${encodeURIComponent(selected)}`);
+    setPlayerTags((prev) => prev.filter((t) => t.id !== tag.id));
+  }
+
+  const assignedIds = new Set(playerTags.map((t) => t.id));
+  const availableToAssign = allTags.filter((t) => !assignedIds.has(t.id));
 
   return (
     <div className="player-notes-layout">
@@ -177,10 +200,10 @@ function PlayerNotes() {
           <button onClick={addRawUsername}>{t("common.create")}</button>
         </div>
 
-        {tags.length > 0 && (
+        {allTags.length > 0 && (
           <select value={filterTag} onChange={(e) => setFilterTag(e.target.value)}>
             <option value="">{t("tags.filterByTag")}</option>
-            {tags.map((tag) => (
+            {allTags.map((tag) => (
               <option key={tag.id} value={tag.id}>{tag.name}</option>
             ))}
           </select>
@@ -209,24 +232,53 @@ function PlayerNotes() {
       <main className="player-notes-editor">
         {selected ? (
           <>
-            <h3 style={{ marginBottom: 10 }}>{selected}</h3>
-            <div className="live-md-editor" style={{ minHeight: 300 }}>
-              <textarea
-                value={noteBody}
-                onChange={(e) => handleNoteChange(e.target.value)}
-                onBlur={() => saveNote(noteBody)}
-                placeholder={t("playerNotes.notePlaceholder")}
-                style={{ width: "100%", resize: "vertical", minHeight: 300 }}
-              />
-              <div className="live-md-preview markdown markdown-note" style={{ minHeight: 300 }}>
-                {noteBody.trim()
-                  ? <Markdown>{noteBody}</Markdown>
-                  : <p style={{ color: "var(--text-muted)", margin: 0 }}>{t("playerNotes.notePlaceholder")}</p>}
-              </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <Avatar mcUsername={selected} size={32} />
+              <h3 style={{ margin: 0 }}>{selected}</h3>
             </div>
+
+            {/* Tag chips for this player */}
+            {allTags.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                {playerTags.map((tag) => (
+                  <span
+                    key={tag.id}
+                    className="player-tag-chip"
+                    style={{ "--chip-color": tag.color } as React.CSSProperties}
+                    onClick={() => detachTag(tag)}
+                    title={t("tags.detach")}
+                  >
+                    {tag.name} ×
+                  </span>
+                ))}
+                {playerTags.length < MAX_PLAYER_TAGS && availableToAssign.length > 0 && (
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const tag = allTags.find((t) => String(t.id) === e.target.value);
+                      if (tag) assignTag(tag);
+                    }}
+                    className="tag-assign-select"
+                  >
+                    <option value="">{t("tags.addTag")}</option>
+                    {availableToAssign.map((tag) => (
+                      <option key={tag.id} value={tag.id}>{tag.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+
+            <MarkdownEditor
+              value={noteBody}
+              onChange={handleNoteChange}
+              onBlur={() => saveNote(noteBody)}
+              placeholder={t("playerNotes.notePlaceholder")}
+              minHeight={300}
+            />
           </>
         ) : (
-          <p className="empty" style={{ color: "var(--text-muted)", paddingTop: 40 }}>{t("playerNotes.searchPlaceholder")}</p>
+          <p className="empty" style={{ color: "var(--text-muted)", paddingTop: 40 }}>{t("playerNotes.selectPrompt")}</p>
         )}
       </main>
     </div>

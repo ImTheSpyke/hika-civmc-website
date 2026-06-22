@@ -26,6 +26,7 @@ export function Nav() {
     <nav className="nav">
       <div className="nav-links">
         {navLink("/notes", t("nav.notes"))}
+        {navLink("/tags", t("nav.tags"))}
         {navLink("/newspapers", t("nav.newspapers"))}
         {navLink("/events", t("nav.events"))}
         {user.isAdmin && navLink("/admin", t("nav.admin"))}

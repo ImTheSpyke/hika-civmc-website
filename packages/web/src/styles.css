@@ -236,6 +236,33 @@ button.btn-reported:hover { background: var(--danger); color: #fff; }
 /* Archived newspaper badge */
 .badge-archived { background: var(--system); color: #000; }
 
+/* Player tag chips in the notes editor */
+.player-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--chip-color, var(--accent)) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--chip-color, var(--accent)) 60%, transparent);
+  color: color-mix(in srgb, var(--chip-color, var(--accent)) 80%, var(--text));
+  user-select: none;
+  transition: opacity 0.1s;
+}
+.player-tag-chip:hover { opacity: 0.7; }
+
+.tag-assign-select {
+  width: auto;
+  padding: 2px 8px;
+  font-size: 12px;
+  height: 26px;
+  border-radius: 12px;
+  border-color: var(--border);
+}
+
 /* Markdown rendering — links and images are intentionally not produced. */
 .markdown { line-height: 1.55; word-break: break-word; }
 .markdown > :first-child { margin-top: 0; }
@@ -288,7 +315,51 @@ button.btn-reported:hover { background: var(--danger); color: #fff; }
   letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 6px;
 }
 
-/* Live side-by-side markdown editor */
+/* Single-pane markdown editor — shows render at rest, textarea on click */
+.md-editor-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.md-editor-render {
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: text;
+  word-break: break-word;
+  line-height: 1.6;
+  transition: border-color 0.15s;
+  outline: none;
+}
+.md-editor-render:hover,
+.md-editor-render:focus { border-color: var(--accent); }
+
+.md-editor-placeholder { color: var(--text-muted); font-size: 14px; }
+
+.md-editor-textarea {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.6;
+  padding: 12px;
+  resize: vertical;
+  outline: none;
+}
+
+.md-editor-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Legacy live side-by-side — kept for article editors */
 .live-md-editor {
   display: grid;
   grid-template-columns: 1fr 1fr;

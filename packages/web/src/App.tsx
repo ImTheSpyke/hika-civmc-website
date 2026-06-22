@@ -6,6 +6,7 @@ import { LoginPage } from "./pages/LoginPage.js";
 import { OnboardingPage } from "./pages/OnboardingPage.js";
 import { ProfilePage } from "./pages/ProfilePage.js";
 import { NotesPage } from "./pages/NotesPage.js";
+import { TagsPage } from "./pages/TagsPage.js";
 import {
   NewspapersPage,
   NewspaperDetailPage,
@@ -37,6 +38,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<Navigate to="/notes" />} />
         <Route path="/notes" element={<NotesPage />} />
+        <Route path="/tags" element={<TagsPage />} />
         <Route path="/players" element={<Navigate to="/notes" />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/newspapers" element={<NewspapersPage />} />

@@ -90,6 +90,15 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
+  // Cancel the caller's pending username-change request
+  app.delete("/api/me/username-change", { preHandler: requireAuth }, async (req, reply) => {
+    await query(
+      "DELETE FROM username_change_requests WHERE user_id = ? AND status = 'pending'",
+      [req.sessionUser!.id]
+    );
+    return reply.send({ ok: true });
+  });
+
   // Request verification
   app.post(
     "/api/me/verify-request",
