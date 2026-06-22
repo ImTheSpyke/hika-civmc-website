@@ -3,6 +3,7 @@ import fastifyCookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
 import fastifyRateLimit from "@fastify/rate-limit";
 import path from "node:path";
+import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
 import { initDb } from "./db.js";
@@ -55,16 +56,13 @@ async function start(): Promise<void> {
   // Serve static SPA in production
   if (config.nodeEnv === "production") {
     const publicDir = path.join(__dirname, "..", "public");
-    await app.register(fastifyStatic, {
-      root: publicDir,
-      prefix: "/",
-      decorateReply: false,
-    });
+    await app.register(fastifyStatic, { root: publicDir, prefix: "/" });
 
     // SPA fallback — all non-API routes serve index.html
     app.setNotFoundHandler(async (req, reply) => {
       if (!req.url.startsWith("/api")) {
-        return reply.sendFile("index.html", publicDir);
+        const html = await fs.readFile(path.join(publicDir, "index.html"));
+        return reply.type("text/html").send(html);
       }
       return reply.code(404).send({ error: { code: "error.notFound", message: "Not found" } });
     });

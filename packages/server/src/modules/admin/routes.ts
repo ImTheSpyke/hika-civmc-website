@@ -64,21 +64,27 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   // --- Admin log ---
   app.get<{
-    Querystring: { action?: string; actor?: string; before?: string; limit?: string };
+    Querystring: { action?: string; actor?: string; page?: string; limit?: string };
   }>("/api/admin/log", { preHandler: requireAdmin }, async (req, reply) => {
-    const { action, actor, before, limit } = req.query;
+    const { action, actor, page, limit } = req.query;
     const conditions: string[] = [];
     const params: unknown[] = [];
-    if (action) { conditions.push("action = ?"); params.push(action); }
-    if (actor) { conditions.push("actor_id = ?"); params.push(actor); }
-    if (before) { conditions.push("at < ?"); params.push(before); }
+    if (action) { conditions.push("l.action = ?"); params.push(action); }
+    if (actor) { conditions.push("l.actor_id = ?"); params.push(actor); }
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const lim = Math.min(parseInt(limit ?? "50", 10), 200);
-    const [rows] = await query<RowDataPacket[]>(
-      `SELECT id, at, actor_id, action, target_type, target_id, meta FROM admin_log ${where} ORDER BY at DESC LIMIT ?`,
-      [...params, lim]
+    const offset = (Math.max(1, parseInt(page ?? "1", 10)) - 1) * lim;
+    const [[{ total }]] = await query<RowDataPacket[]>(
+      `SELECT COUNT(*) as total FROM admin_log l ${where}`, params
     );
-    return reply.send(rows);
+    const [rows] = await query<RowDataPacket[]>(
+      `SELECT l.id, l.at, l.actor_id, u.discord_display_name as actor_name,
+              l.action, l.target_type, l.target_id, l.meta
+       FROM admin_log l LEFT JOIN users u ON u.id = l.actor_id
+       ${where} ORDER BY l.at DESC LIMIT ? OFFSET ?`,
+      [...params, lim, offset]
+    );
+    return reply.send({ total, page: parseInt(page ?? "1", 10), limit: lim, rows });
   });
 
   // --- User management ---

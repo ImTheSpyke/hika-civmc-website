@@ -8,9 +8,13 @@ async function request<T>(
   path: string,
   options?: RequestInit
 ): Promise<T> {
+  const hasBody = options?.body !== undefined && options.body !== null;
   const res = await fetch(path, {
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...(options?.headers ?? {}) },
+    headers: {
+      ...(hasBody ? { "Content-Type": "application/json" } : {}),
+      ...(options?.headers ?? {}),
+    },
     ...options,
   });
 
