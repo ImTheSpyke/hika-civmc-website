@@ -58,7 +58,12 @@ export function ProfilePage() {
 
   return (
     <div className="page">
-      <h2>{t("profile.title")}</h2>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20 }}>
+        <h2 style={{ margin: 0 }}>{t("profile.title")}</h2>
+        <span style={{ fontSize: 14, color: "var(--text-muted)", fontFamily: "monospace" }}>
+          @{user.discordUsername}
+        </span>
+      </div>
 
       <div className="card">
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>

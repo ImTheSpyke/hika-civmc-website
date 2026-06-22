@@ -129,8 +129,9 @@ interface SidebarProps {
   searchResults: UserResult[];
   onPickSearchResult: (u: string) => void;
   onAddRaw: (u: string) => void;
-  filterTag: number | null;
-  onFilterTag: (id: number | null) => void;
+  filterTags: number[];
+  onToggleFilterTag: (id: number) => void;
+  onClearFilter: () => void;
   sort: SortKey;
   onSort: (s: SortKey) => void;
 }
@@ -146,18 +147,20 @@ function Sidebar({
   searchResults,
   onPickSearchResult,
   onAddRaw,
-  filterTag,
-  onFilterTag,
+  filterTags,
+  onToggleFilterTag,
+  onClearFilter,
   sort,
   onSort,
 }: SidebarProps) {
   const { t } = useI18n();
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key !== "Enter") return;
     const q = search.trim();
     if (!q) return;
-    // If there's exactly one search result, pick it; otherwise treat as raw username.
     if (searchResults.length === 1) {
       onPickSearchResult(searchResults[0].mcUsername ?? searchResults[0].discordUsername);
     } else {
@@ -165,8 +168,41 @@ function Sidebar({
     }
   }
 
+  function requestDelete(mcUsername: string, ev: React.MouseEvent) {
+    ev.stopPropagation();
+    setConfirmDelete(mcUsername);
+  }
+
+  function confirmAndDelete() {
+    if (confirmDelete) {
+      onDelete(confirmDelete);
+      setConfirmDelete(null);
+    }
+  }
+
+  const SORT_LABELS: Record<SortKey, string> = {
+    updated: t("notes.sortUpdated"),
+    username: t("notes.sortUsername"),
+    tag: t("notes.sortTag"),
+  };
+
   return (
     <aside className="notes-sidebar">
+      {/* Delete confirmation overlay */}
+      {confirmDelete && (
+        <div className="notes-delete-confirm">
+          <p>{t("playerNotes.confirmDelete", { name: confirmDelete })}</p>
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            <button className="btn-small btn-danger" onClick={confirmAndDelete}>
+              {t("common.delete")}
+            </button>
+            <button className="btn-small btn-secondary" onClick={() => setConfirmDelete(null)}>
+              {t("common.cancel")}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Unified search + add input */}
       <div className="search-box">
         <input
@@ -191,28 +227,58 @@ function Sidebar({
         )}
       </div>
 
-      {/* Filter + sort row */}
-      <div className="notes-filter-row">
-        <select
-          value={filterTag ?? ""}
-          onChange={(e) => onFilterTag(e.target.value ? Number(e.target.value) : null)}
-          style={{ flex: 1 }}
+      {/* Filter + sort toolbar */}
+      <div className="notes-toolbar">
+        <button
+          className={`notes-toolbar-btn${showFilters ? " active" : ""}`}
+          onClick={() => setShowFilters((v) => !v)}
+          title={t("tags.filterByTag")}
         >
-          <option value="">{t("tags.filterByTag")}</option>
-          {allTags.map((tag) => (
-            <option key={tag.id} value={tag.id}>{tag.name}</option>
+          <span>⊞</span>
+          {filterTags.length > 0 && (
+            <span className="notes-toolbar-badge">{filterTags.length}</span>
+          )}
+        </button>
+
+        {/* Sort pills */}
+        <div className="notes-sort-pills">
+          {(["updated", "username", "tag"] as SortKey[]).map((key) => (
+            <button
+              key={key}
+              className={`notes-sort-pill${sort === key ? " active" : ""}`}
+              onClick={() => onSort(key)}
+            >
+              {SORT_LABELS[key]}
+            </button>
           ))}
-        </select>
-        <select
-          value={sort}
-          onChange={(e) => onSort(e.target.value as SortKey)}
-          style={{ width: "auto" }}
-        >
-          <option value="updated">{t("notes.sortUpdated")}</option>
-          <option value="username">{t("notes.sortUsername")}</option>
-          <option value="tag">{t("notes.sortTag")}</option>
-        </select>
+        </div>
       </div>
+
+      {/* Tag filter panel */}
+      {showFilters && allTags.length > 0 && (
+        <div className="notes-tag-filter">
+          {filterTags.length > 0 && (
+            <button className="notes-tag-filter-clear" onClick={onClearFilter}>
+              {t("notes.clearFilter")}
+            </button>
+          )}
+          <div className="notes-tag-filter-chips">
+            {allTags.map((tag) => {
+              const active = filterTags.includes(tag.id);
+              return (
+                <span
+                  key={tag.id}
+                  className={`player-tag-chip${active ? " chip-active" : ""}`}
+                  style={{ "--chip-color": tag.color } as React.CSSProperties}
+                  onClick={() => onToggleFilterTag(tag.id)}
+                >
+                  {tag.name}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Player list */}
       <ul className="noted-players">
@@ -236,7 +302,7 @@ function Sidebar({
               )}
               {e.tags.length > 0 && (
                 <div className="noted-player-tags">
-                  {e.tags.slice(0, 3).map((tag) => (
+                  {e.tags.slice(0, 4).map((tag) => (
                     <span
                       key={tag.id}
                       className="tag-dot"
@@ -244,8 +310,8 @@ function Sidebar({
                       title={tag.name}
                     />
                   ))}
-                  {e.tags.length > 3 && (
-                    <span className="tag-dot-more">+{e.tags.length - 3}</span>
+                  {e.tags.length > 4 && (
+                    <span className="tag-dot-more">+{e.tags.length - 4}</span>
                   )}
                 </div>
               )}
@@ -255,7 +321,7 @@ function Sidebar({
             </div>
             <button
               className="btn-small btn-ghost"
-              onClick={(ev) => { ev.stopPropagation(); onDelete(e.mcUsername); }}
+              onClick={(ev) => requestDelete(e.mcUsername, ev)}
               title={t("playerNotes.deleteNote")}
             >×</button>
           </li>
@@ -364,7 +430,6 @@ export function NotesPage() {
   // Raw data
   const [notes, setNotes] = useState<PlayerNote[]>([]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
-  // Maps mcUsername → assigned tags
   const [tagMap, setTagMap] = useState<Record<string, Tag[]>>({});
 
   // UI state
@@ -376,7 +441,7 @@ export function NotesPage() {
   // Search / filter / sort
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<UserResult[]>([]);
-  const [filterTag, setFilterTag] = useState<number | null>(null);
+  const [filterTags, setFilterTags] = useState<number[]>([]);
   const [sort, setSort] = useState<SortKey>("updated");
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -392,7 +457,6 @@ export function NotesPage() {
     setNotes(fetchedNotes);
     setAllTags(fetchedTags);
 
-    // Fetch tag assignments for all noted players in parallel
     if (fetchedNotes.length > 0 && fetchedTags.length > 0) {
       const entries = await Promise.all(
         fetchedNotes.map(async (n) => {
@@ -415,11 +479,10 @@ export function NotesPage() {
 
   const entries: PlayerEntry[] = notes
     .filter((n) => {
-      if (filterTag) {
-        const tags = tagMap[n.mcUsername] ?? [];
-        if (!tags.some((t) => t.id === filterTag)) return false;
-      }
-      return true;
+      if (filterTags.length === 0) return true;
+      const tags = tagMap[n.mcUsername] ?? [];
+      // must have ALL selected filter tags
+      return filterTags.every((id) => tags.some((t) => t.id === id));
     })
     .map((n) => ({
       mcUsername: n.mcUsername,
@@ -437,7 +500,6 @@ export function NotesPage() {
         const tb = b.tags[0]?.name ?? "";
         return ta.localeCompare(tb) || a.mcUsername.localeCompare(b.mcUsername);
       }
-      // updated (default)
       const da = a.updatedAt ?? "";
       const db = b.updatedAt ?? "";
       return db.localeCompare(da);
@@ -464,7 +526,6 @@ export function NotesPage() {
     setSearchResults([]);
     setSaveStatus("idle");
 
-    // Load note
     try {
       const note = await api.get<{ body: string }>(
         `/api/player-notes/${encodeURIComponent(mcUsername)}`
@@ -474,7 +535,6 @@ export function NotesPage() {
       setNoteBody("");
     }
 
-    // Load tag assignments from cache (tagMap) or re-fetch
     const cached = tagMap[mcUsername];
     if (cached !== undefined) {
       setPlayerTags(cached);
@@ -490,7 +550,6 @@ export function NotesPage() {
   }, [tagMap, allTags]);
 
   async function pickSearchResult(mcUsername: string) {
-    // If this player isn't noted yet, create an empty note so they appear
     if (!notes.some((n) => n.mcUsername === mcUsername)) {
       await api.put(`/api/player-notes/${encodeURIComponent(mcUsername)}`, { body: "" });
       await loadData();
@@ -523,7 +582,6 @@ export function NotesPage() {
     try {
       await api.put(`/api/player-notes/${encodeURIComponent(selected)}`, { body });
       setSaveStatus("saved");
-      // Update snippet in list
       setNotes((prev) =>
         prev.map((n) =>
           n.mcUsername === selected ? { ...n, body, updatedAt: new Date().toISOString() } : n
@@ -574,12 +632,18 @@ export function NotesPage() {
     setTagMap((prev) => ({ ...prev, [selected]: updated }));
   }
 
+  // ── filter helpers ────────────────────────────────────────────────────────
+
+  function toggleFilterTag(id: number) {
+    setFilterTags((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
   return (
     <div className="notes-page-wrap">
-      {/* Global notepad strip */}
       <GlobalNotepad />
 
-      {/* Main layout */}
       <div className="notes-layout">
         <Sidebar
           entries={entries}
@@ -592,8 +656,9 @@ export function NotesPage() {
           searchResults={searchResults}
           onPickSearchResult={pickSearchResult}
           onAddRaw={addRawUsername}
-          filterTag={filterTag}
-          onFilterTag={setFilterTag}
+          filterTags={filterTags}
+          onToggleFilterTag={toggleFilterTag}
+          onClearFilter={() => setFilterTags([])}
           sort={sort}
           onSort={setSort}
         />

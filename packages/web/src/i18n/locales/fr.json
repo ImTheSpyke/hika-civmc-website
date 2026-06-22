@@ -43,10 +43,12 @@
   "playerNotes.deleteNote": "Supprimer la note",
   "playerNotes.verified": "Vérifié",
   "playerNotes.selectPrompt": "Sélectionnez un joueur pour voir ou rédiger une note.",
+  "playerNotes.confirmDelete": "Supprimer {name} et toutes ses notes ?",
 
   "notes.sortUpdated": "Récent",
   "notes.sortUsername": "Pseudo",
   "notes.sortTag": "Tag",
+  "notes.clearFilter": "Effacer",
 
   "tags.title": "Tags",
   "tags.create": "Nouveau tag",
