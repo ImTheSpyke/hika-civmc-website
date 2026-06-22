@@ -36,12 +36,17 @@
   "globalNotes.chars": "{count}/{max} caractères",
 
   "playerNotes.title": "Notes des joueurs",
-  "playerNotes.searchPlaceholder": "Rechercher par Discord ou pseudo Minecraft…",
+  "playerNotes.searchPlaceholder": "Rechercher ou ajouter un joueur…",
   "playerNotes.addByUsername": "Noter un joueur par pseudo",
   "playerNotes.notePlaceholder": "Votre note privée sur ce joueur…",
   "playerNotes.noNotes": "Vous n'avez encore noté aucun joueur.",
   "playerNotes.deleteNote": "Supprimer la note",
   "playerNotes.verified": "Vérifié",
+  "playerNotes.selectPrompt": "Sélectionnez un joueur pour voir ou rédiger une note.",
+
+  "notes.sortUpdated": "Récent",
+  "notes.sortUsername": "Pseudo",
+  "notes.sortTag": "Tag",
 
   "tags.title": "Tags",
   "tags.create": "Nouveau tag",

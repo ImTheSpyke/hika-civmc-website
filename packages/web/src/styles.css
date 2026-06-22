@@ -115,21 +115,53 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 .stats-pending { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
 
-/* Player notes layout */
-.player-notes-layout { display: grid; grid-template-columns: 280px 1fr; gap: 24px; max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
-.player-notes-sidebar { border-right: 1px solid var(--border); padding-right: 20px; display: flex; flex-direction: column; gap: 12px; }
-.search-results { list-style: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); position: absolute; z-index: 10; width: 260px; }
-.search-results li { padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
-.search-results li:hover { background: var(--border); }
-.noted-players { list-style: none; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; max-height: calc(100vh - 300px); }
-.noted-players li { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: var(--radius); cursor: pointer; }
-.noted-players li:hover, .noted-players li.active { background: var(--border); }
-.noted-players .empty { color: var(--text-muted); font-size: 13px; }
-.mc-name { font-size: 12px; color: var(--text-muted); }
-.raw-username { display: flex; gap: 6px; }
-.raw-username input { flex: 1; }
-.raw-username button { flex-shrink: 0; width: auto; }
+/* ── Notes page ────────────────────────────────────────────────────────────── */
+.notes-page-wrap { max-width: 1160px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+/* Global notepad collapsible strip */
+.global-notepad { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.global-notepad-toggle {
+  width: 100%; text-align: left; border-radius: 0; background: var(--surface);
+  border: none; color: var(--text); padding: 10px 14px; font-size: 14px; font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+}
+.global-notepad-toggle:hover { background: var(--border); }
+.global-notepad-icon { font-size: 12px; color: var(--text-muted); }
+.notepad-status { font-size: 12px; font-weight: 400; color: var(--text-muted); margin-left: auto; }
+.notepad-status.saved { color: var(--success); }
+.global-notepad-body { padding: 12px; background: var(--bg); border-top: 1px solid var(--border); }
+
+/* Notes two-column layout */
+.notes-layout { display: grid; grid-template-columns: 280px 1fr; gap: 0; min-height: calc(100vh - 180px); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+
+/* Sidebar */
+.notes-sidebar { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-right: 1px solid var(--border); background: var(--surface); overflow: hidden; }
 .search-box { position: relative; }
+.search-results { list-style: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); position: absolute; z-index: 10; width: 100%; top: calc(100% + 4px); box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+.search-results li { padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.search-results li:hover { background: var(--border); }
+.notes-filter-row { display: flex; gap: 6px; }
+.noted-players { list-style: none; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1; min-height: 0; }
+.noted-players li { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px; cursor: pointer; transition: background 0.1s; }
+.noted-players li:hover, .noted-players li.active { background: var(--border); }
+.noted-players .empty { color: var(--text-muted); font-size: 13px; padding: 8px; }
+.noted-player-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.noted-player-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.noted-player-tags { display: flex; align-items: center; gap: 3px; }
+.tag-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.tag-dot-more { font-size: 10px; color: var(--text-muted); }
+.noted-player-discord { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.noted-player-snippet { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mc-name { font-size: 12px; color: var(--text-muted); }
+.btn-ghost { background: transparent; color: var(--text-muted); border: none; padding: 2px 6px; font-size: 14px; flex-shrink: 0; }
+.btn-ghost:hover { background: transparent; color: var(--danger); }
+
+/* Editor area */
+.notes-editor-area { background: var(--bg); display: flex; flex-direction: column; min-height: 0; }
+.notes-empty-state { display: flex; align-items: center; justify-content: center; flex: 1; color: var(--text-muted); font-size: 14px; padding: 40px; }
+.notes-editor-panel { display: flex; flex-direction: column; gap: 12px; padding: 16px; height: 100%; }
+.editor-player-header { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.editor-tag-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 
 /* Global notes */
 .notes-footer { display: flex; justify-content: space-between; margin-top: 8px; font-size: 13px; color: var(--text-muted); }
@@ -212,8 +244,7 @@ input.input-error, textarea.input-error { border-color: var(--danger); }
 .card-pending { border-color: var(--system); opacity: 0.9; }
 .badge-pending { background: var(--system); color: #000; }
 
-/* Notes page tab switcher */
-.notes-page { max-width: 1100px; }
+/* Notes page tab switcher (used in newspapers page) */
 .notes-tab-switcher { display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .notes-tab-switcher button { border-radius: 0; border: none; background: transparent; color: var(--text-muted); padding: 6px 16px; font-size: 13px; }
 .notes-tab-switcher button.active { background: var(--accent); color: #fff; }
@@ -224,8 +255,8 @@ input[type="datetime-local"] { color-scheme: dark; }
 
 /* Responsive: collapse sidebar on small screens */
 @media (max-width: 640px) {
-  .player-notes-layout { grid-template-columns: 1fr; }
-  .player-notes-sidebar { border-right: none; border-bottom: 1px solid var(--border); padding-right: 0; padding-bottom: 16px; }
+  .notes-layout { grid-template-columns: 1fr; }
+  .notes-sidebar { border-right: none; border-bottom: 1px solid var(--border); max-height: 300px; }
   .form-row { flex-direction: column; }
 }
 

@@ -69,6 +69,15 @@ export function NewspapersPage() {
     setSubmitError("");
   }
 
+  async function toggleSubscribe(id: number, currentlySubscribed: boolean) {
+    if (currentlySubscribed) {
+      await api.delete(`/api/newspapers/${id}/subscribe`);
+    } else {
+      await api.post(`/api/newspapers/${id}/subscribe`);
+    }
+    loadAll();
+  }
+
   const displayed = tab === "subscribed" ? subscribed : newspapers;
 
   return (
@@ -149,7 +158,7 @@ export function NewspapersPage() {
       )}
       <ul className="card-list">
         {displayed.map((np) => (
-          <li key={np.id} className="card" style={{ cursor: "pointer" }} onClick={() => navigate(`/newspapers/${np.id}`)}>
+          <li key={np.id} className="card" style={{ cursor: "pointer", position: "relative" }} onClick={() => navigate(`/newspapers/${np.id}`)}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
               <div>
                 <strong>{np.name}</strong>
@@ -157,6 +166,18 @@ export function NewspapersPage() {
                 {np.active === false && !np.archived && <span className="badge" style={{ marginLeft: 6 }}>{t("newspapers.hidden")}</span>}
                 {np.mine && <span className="badge" style={{ marginLeft: 6, background: "var(--success)" }}>Mine</span>}
               </div>
+              {!np.mine && (
+                <button
+                  className={`btn-small ${np.subscribed ? "btn-secondary" : ""}`}
+                  style={{ flexShrink: 0 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleSubscribe(np.id, !!np.subscribed);
+                  }}
+                >
+                  {np.subscribed ? t("newspapers.unsubscribe") : t("newspapers.subscribe")}
+                </button>
+              )}
             </div>
             {np.description && <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>{np.description}</p>}
           </li>

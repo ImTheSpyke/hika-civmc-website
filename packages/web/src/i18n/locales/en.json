@@ -36,13 +36,17 @@
   "globalNotes.chars": "{count}/{max} characters",
 
   "playerNotes.title": "Player Notes",
-  "playerNotes.searchPlaceholder": "Search by Discord or Minecraft username…",
+  "playerNotes.searchPlaceholder": "Search or add player…",
   "playerNotes.addByUsername": "Note player by username",
   "playerNotes.notePlaceholder": "Your private note about this player…",
   "playerNotes.noNotes": "You haven't noted any players yet.",
   "playerNotes.deleteNote": "Delete note",
   "playerNotes.verified": "Verified",
   "playerNotes.selectPrompt": "Select a player from the list to view or write a note.",
+
+  "notes.sortUpdated": "Recent",
+  "notes.sortUsername": "Username",
+  "notes.sortTag": "Tag",
 
   "tags.title": "Tags",
   "tags.create": "New tag",
