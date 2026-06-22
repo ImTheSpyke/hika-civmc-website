@@ -1,6 +1,7 @@
 services:
   app:
     build: .
+    image: harbor.imthespyke.fr/imthespyke/civmc-website:nightly
     ports:
       - "${PORT:-3000}:3000"
     environment:
@@ -19,6 +20,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - internal
+      - external
 
   db:
     image: mariadb:11
@@ -34,6 +38,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+    internal: true   # db↔app only, no host or internet access for db
+  external:
+    driver: bridge   # app outbound (Discord OAuth, etc.) + host port binding
 
 volumes:
   dbdata:

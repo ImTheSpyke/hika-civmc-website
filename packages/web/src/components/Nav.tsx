@@ -26,6 +26,7 @@ export function Nav() {
     <nav className="nav">
       <div className="nav-links">
         {navLink("/notes", t("nav.notes"))}
+        {navLink("/tags", t("nav.tags"))}
         {navLink("/newspapers", t("nav.newspapers"))}
         {navLink("/events", t("nav.events"))}
         {user.isAdmin && navLink("/admin", t("nav.admin"))}
@@ -44,7 +45,7 @@ export function Nav() {
         )}
         <Link to="/profile" style={{ display: "flex", alignItems: "center", gap: 6, textDecoration: "none" }}>
           <Avatar mcUsername={user.mcUsername} size={24} />
-          <span>{user.discordDisplayName}</span>
+          <span>@{user.discordUsername}</span>
         </Link>
         <button onClick={() => logout()}>{t("nav.logout")}</button>
       </div>

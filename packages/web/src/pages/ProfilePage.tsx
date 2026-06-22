@@ -13,13 +13,14 @@ interface ChangeRequest {
 }
 
 export function ProfilePage() {
-  const { t } = useI18n();
+  const { t, locale, setLocale, availableLocales } = useI18n();
   const { user } = useAuth();
   const [pending, setPending] = useState<ChangeRequest | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ mcUsername: "", reason: "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   function loadPending() {
     api.get<ChangeRequest | null>("/api/me/username-change").then(setPending);
@@ -45,9 +46,24 @@ export function ProfilePage() {
     }
   }
 
+  async function cancelRequest() {
+    setCancelling(true);
+    try {
+      await api.delete("/api/me/username-change");
+      setPending(null);
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   return (
     <div className="page">
-      <h2>{t("profile.title")}</h2>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20 }}>
+        <h2 style={{ margin: 0 }}>{t("profile.title")}</h2>
+        <span style={{ fontSize: 14, color: "var(--text-muted)", fontFamily: "monospace" }}>
+          @{user.discordUsername}
+        </span>
+      </div>
 
       <div className="card">
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
@@ -61,13 +77,7 @@ export function ProfilePage() {
         </div>
 
         <ProfileRow label={t("profile.discord")}>
-          <a
-            href={`https://discord.com/users/${user.discordId}`}
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            {user.discordUsername}
-          </a>
+          <span>@{user.discordUsername}</span>
         </ProfileRow>
 
         <ProfileRow label={t("profile.mcUsername")}>
@@ -79,13 +89,36 @@ export function ProfilePage() {
             <span className="badge">{user.publicFactionTag}</span>
           </ProfileRow>
         )}
+
+        {availableLocales.length > 1 && (
+          <ProfileRow label={t("profile.language")}>
+            <select
+              value={locale}
+              onChange={(e) => setLocale(e.target.value)}
+              style={{ padding: "2px 6px" }}
+            >
+              {availableLocales.map((l) => (
+                <option key={l} value={l}>{l.toUpperCase()}</option>
+              ))}
+            </select>
+          </ProfileRow>
+        )}
       </div>
 
       <div className="card">
         <h3>{t("profile.changeUsername")}</h3>
         {pending ? (
-          <div className="card-pending" style={{ padding: 12 }}>
-            {t("profile.changePending", { name: pending.requestedMcUsername })}
+          <div>
+            <div className="card-pending" style={{ padding: 12, marginBottom: 12 }}>
+              {t("profile.changePending", { name: pending.requestedMcUsername })}
+            </div>
+            <button
+              className="btn-secondary"
+              onClick={cancelRequest}
+              disabled={cancelling}
+            >
+              {t("profile.cancelChangeRequest")}
+            </button>
           </div>
         ) : showForm ? (
           <div>

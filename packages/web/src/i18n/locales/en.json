@@ -18,6 +18,7 @@
 
   "nav.home": "Home",
   "nav.notes": "Notes",
+  "nav.tags": "Tags",
   "nav.globalNotes": "My Notes",
   "nav.playerNotes": "Players",
   "nav.newspapers": "Newspapers",
@@ -35,12 +36,19 @@
   "globalNotes.chars": "{count}/{max} characters",
 
   "playerNotes.title": "Player Notes",
-  "playerNotes.searchPlaceholder": "Search by Discord or Minecraft username…",
+  "playerNotes.searchPlaceholder": "Search or add player…",
   "playerNotes.addByUsername": "Note player by username",
   "playerNotes.notePlaceholder": "Your private note about this player…",
   "playerNotes.noNotes": "You haven't noted any players yet.",
   "playerNotes.deleteNote": "Delete note",
   "playerNotes.verified": "Verified",
+  "playerNotes.selectPrompt": "Select a player from the list to view or write a note.",
+  "playerNotes.confirmDelete": "Remove {name} and all their notes?",
+
+  "notes.sortUpdated": "Recent",
+  "notes.sortUsername": "Username",
+  "notes.sortTag": "Tag",
+  "notes.clearFilter": "Clear",
 
   "tags.title": "Tags",
   "tags.create": "New tag",
@@ -50,6 +58,11 @@
   "tags.assign": "Assign",
   "tags.detach": "Remove",
   "tags.filterByTag": "Filter by tag",
+  "tags.noTags": "No tags yet.",
+  "tags.noPlayersTagged": "No players tagged.",
+  "tags.assignSearch": "Search player to tag…",
+  "tags.assignByUsername": "Or add by Minecraft username",
+  "tags.addTag": "+ Add tag",
 
   "newspapers.title": "Newspapers",
   "newspapers.create": "Create my newspaper",
@@ -135,6 +148,8 @@
   "profile.newMcUsername": "New Minecraft username",
   "profile.changeReason": "Reason (optional)",
   "profile.changePending": "Pending: change to “{name}” awaiting admin approval.",
+  "profile.language": "Language",
+  "profile.cancelChangeRequest": "Cancel request",
   "profile.changeWarningCaseSensitive": "Case sensitive — type it exactly.",
   "profile.changeWarningSupport": "Username changes require admin approval. You cannot change it yourself.",
 
