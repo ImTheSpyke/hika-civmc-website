@@ -41,6 +41,9 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const [[{ pendingEvents }]] = await query<RowDataPacket[]>(
       "SELECT COUNT(*) as pendingEvents FROM events WHERE status = 'pending'"
     );
+    const [[{ pendingUsernameChanges }]] = await query<RowDataPacket[]>(
+      "SELECT COUNT(*) as pendingUsernameChanges FROM username_change_requests WHERE status = 'pending'"
+    );
     const [[{ moderationReviews }]] = await query<RowDataPacket[]>(
       "SELECT COUNT(*) as moderationReviews FROM newspapers WHERE active = FALSE AND status = 'approved' UNION ALL SELECT COUNT(*) FROM articles WHERE active = FALSE UNION ALL SELECT COUNT(*) FROM events WHERE active = FALSE AND status = 'approved'"
     );
@@ -57,6 +60,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         accounts: pendingAccounts,
         newspapers: pendingNewspapers,
         events: pendingEvents,
+        usernameChanges: pendingUsernameChanges,
         moderationReviews,
       },
     });
@@ -162,6 +166,56 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
+  // --- Username change requests ---
+  app.get("/api/admin/username-changes", { preHandler: requireAdmin }, async (_req, reply) => {
+    const [rows] = await query<RowDataPacket[]>(
+      `SELECT r.id, r.user_id, r.requested_mc_username, r.reason, r.created_at,
+              u.discord_display_name, u.mc_username as current_mc_username
+       FROM username_change_requests r JOIN users u ON u.id = r.user_id
+       WHERE r.status = 'pending' ORDER BY r.created_at ASC`
+    );
+    return reply.send(rows);
+  });
+
+  app.post<{ Params: { id: string } }>(
+    "/api/admin/username-changes/:id/approve",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const reqId = parseInt(req.params.id, 10);
+      const [rows] = await query<RowDataPacket[]>(
+        "SELECT user_id, requested_mc_username FROM username_change_requests WHERE id = ? AND status = 'pending'",
+        [reqId]
+      );
+      if (!rows.length) return reply.code(404).send({ error: { code: "error.notFound", message: "Not found" } });
+      const { user_id, requested_mc_username } = rows[0];
+      // Release the old username link, set new name, re-link to the new name.
+      await releaseUsername(user_id as number);
+      await query("UPDATE users SET mc_username = ?, mc_verified = FALSE WHERE id = ?", [requested_mc_username, user_id]);
+      await backfillUsername(requested_mc_username as string, user_id as number);
+      await query(
+        "UPDATE username_change_requests SET status = 'approved', resolved_at = NOW(), resolved_by = ? WHERE id = ?",
+        [req.sessionUser!.id, reqId]
+      );
+      await adminLog(req.sessionUser!.id, "user.username_change_approve", "user", user_id as number, { mcUsername: requested_mc_username });
+      return reply.send({ ok: true });
+    }
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/admin/username-changes/:id/reject",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const reqId = parseInt(req.params.id, 10);
+      const [r] = await query<RowDataPacket[]>(
+        "UPDATE username_change_requests SET status = 'rejected', resolved_at = NOW(), resolved_by = ? WHERE id = ? AND status = 'pending'",
+        [req.sessionUser!.id, reqId]
+      );
+      if ((r as any).affectedRows === 0) return reply.code(404).send({ error: { code: "error.notFound", message: "Not found" } });
+      await adminLog(req.sessionUser!.id, "user.username_change_reject", "user", reqId);
+      return reply.send({ ok: true });
+    }
+  );
+
   // --- Newspaper management ---
   app.get<{ Querystring: { status?: string } }>(
     "/api/admin/newspapers",
@@ -208,6 +262,18 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       const id = parseInt(req.params.id, 10);
       await query("DELETE FROM newspapers WHERE id = ?", [id]);
       await adminLog(req.sessionUser!.id, "moderation.remove", "newspaper", id);
+      return reply.send({ ok: true });
+    }
+  );
+
+  // Lift an archive — super-admin only (owners cannot un-archive).
+  app.post<{ Params: { id: string } }>(
+    "/api/admin/newspapers/:id/unarchive",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const id = parseInt(req.params.id, 10);
+      await query("UPDATE newspapers SET archived = FALSE WHERE id = ?", [id]);
+      await adminLog(req.sessionUser!.id, "newspaper.unarchive", "newspaper", id);
       return reply.send({ ok: true });
     }
   );
@@ -291,12 +357,17 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   // --- Moderation queue ---
   app.get("/api/admin/moderation", { preHandler: requireAdmin }, async (_req, reply) => {
+    // `newspaperId` lets the admin UI build an "open page" link to the affected
+    // newspaper (for both hidden newspapers and hidden articles within one).
     const [hidden] = await query<RowDataPacket[]>(
-      `SELECT 'newspaper' as type, id, name as title, active FROM newspapers WHERE active = FALSE AND status = 'approved'
+      `SELECT 'newspaper' as type, n.id, n.name as title, n.name as newspaper_name, n.id as newspaper_id, n.active
+         FROM newspapers n WHERE n.active = FALSE AND n.status = 'approved'
        UNION ALL
-       SELECT 'article', id, title, active FROM articles WHERE active = FALSE
+       SELECT 'article', a.id, a.title, n.name as newspaper_name, n.id as newspaper_id, a.active
+         FROM articles a JOIN newspapers n ON n.id = a.newspaper_id WHERE a.active = FALSE
        UNION ALL
-       SELECT 'event', id, name as title, active FROM events WHERE active = FALSE AND status = 'approved'`
+       SELECT 'event', e.id, e.name as title, NULL as newspaper_name, NULL as newspaper_id, e.active
+         FROM events e WHERE e.active = FALSE AND e.status = 'approved'`
     );
     return reply.send(hidden);
   });

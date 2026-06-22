@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { requireAuth } from "../../auth/session.js";
+import { requireOnboarded } from "../../auth/session.js";
 import { query } from "../../db.js";
 import type { RowDataPacket } from "mysql2";
 
@@ -7,7 +7,7 @@ export async function playerNotesRoutes(app: FastifyInstance): Promise<void> {
   // List all noted players for the current user
   app.get<{ Querystring: { tag?: string } }>(
     "/api/player-notes",
-    { preHandler: requireAuth },
+    { preHandler: requireOnboarded },
     async (req, reply) => {
       const authorId = req.sessionUser!.id;
       const { tag } = req.query;
@@ -54,7 +54,7 @@ export async function playerNotesRoutes(app: FastifyInstance): Promise<void> {
   // Get a single note
   app.get<{ Params: { username: string } }>(
     "/api/player-notes/:username",
-    { preHandler: requireAuth },
+    { preHandler: requireOnboarded },
     async (req, reply) => {
       const [rows] = await query<RowDataPacket[]>(
         "SELECT body, updated_at FROM player_notes WHERE author_id = ? AND target_mc_username = ?",
@@ -68,11 +68,21 @@ export async function playerNotesRoutes(app: FastifyInstance): Promise<void> {
   // Upsert a note
   app.put<{ Params: { username: string }; Body: { body: string } }>(
     "/api/player-notes/:username",
-    { preHandler: requireAuth },
+    { preHandler: requireOnboarded },
     async (req, reply) => {
       const { username } = req.params;
       const { body } = req.body;
       const authorId = req.sessionUser!.id;
+
+      if (typeof body !== "string") {
+        return reply.code(400).send({ error: { code: "error.invalidInput", message: "body must be a string" } });
+      }
+      if (body.length > 5000) {
+        return reply.code(400).send({ error: { code: "error.tooLong", message: "Max 5000 characters" } });
+      }
+      if (!/^[A-Za-z0-9_]{1,16}$/.test(username)) {
+        return reply.code(400).send({ error: { code: "error.invalidUsername", message: "Invalid username" } });
+      }
 
       // Resolve optional user id
       const [users] = await query<RowDataPacket[]>(
@@ -94,7 +104,7 @@ export async function playerNotesRoutes(app: FastifyInstance): Promise<void> {
   // Delete a note
   app.delete<{ Params: { username: string } }>(
     "/api/player-notes/:username",
-    { preHandler: requireAuth },
+    { preHandler: requireOnboarded },
     async (req, reply) => {
       await query(
         "DELETE FROM player_notes WHERE author_id = ? AND target_mc_username = ?",

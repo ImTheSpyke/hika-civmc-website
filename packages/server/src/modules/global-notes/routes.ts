@@ -1,12 +1,12 @@
 import type { FastifyInstance } from "fastify";
-import { requireAuth } from "../../auth/session.js";
+import { requireOnboarded } from "../../auth/session.js";
 import { query } from "../../db.js";
 import type { RowDataPacket } from "mysql2";
 
 const MAX_CHARS = 5000;
 
 export async function globalNotesRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/api/global-notes", { preHandler: requireAuth }, async (req, reply) => {
+  app.get("/api/global-notes", { preHandler: requireOnboarded }, async (req, reply) => {
     const [rows] = await query<RowDataPacket[]>(
       "SELECT body, updated_at FROM global_notes WHERE user_id = ?",
       [req.sessionUser!.id]
@@ -16,7 +16,7 @@ export async function globalNotesRoutes(app: FastifyInstance): Promise<void> {
 
   app.put<{ Body: { body: string } }>(
     "/api/global-notes",
-    { preHandler: requireAuth },
+    { preHandler: requireOnboarded },
     async (req, reply) => {
       const { body } = req.body;
       if (typeof body !== "string") {

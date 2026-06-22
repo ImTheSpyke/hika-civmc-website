@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n/context.js";
 
@@ -10,7 +11,7 @@ interface Stats {
   newspapers: number;
   articlesPublished: { total: number; last7d: number };
   eventsUpcoming: number;
-  pending: { accounts: number; newspapers: number; events: number; moderationReviews: number };
+  pending: { accounts: number; newspapers: number; events: number; usernameChanges: number; moderationReviews: number };
 }
 
 interface AdminUser {
@@ -28,7 +29,19 @@ interface Moditem {
   type: string;
   id: number;
   title: string;
+  newspaper_name: string | null;
+  newspaper_id: number | null;
   active: boolean;
+}
+
+interface UsernameChange {
+  id: number;
+  user_id: number;
+  requested_mc_username: string;
+  current_mc_username: string | null;
+  discord_display_name: string;
+  reason: string;
+  created_at: string;
 }
 
 interface LogEntry {
@@ -56,6 +69,7 @@ export function AdminPage() {
   const [tab, setTab] = useState<Tab>("stats");
   const [stats, setStats] = useState<Stats | null>(null);
   const [pendingUsers, setPendingUsers] = useState<AdminUser[]>([]);
+  const [usernameChanges, setUsernameChanges] = useState<UsernameChange[]>([]);
   const [modItems, setModItems] = useState<Moditem[]>([]);
   const [logData, setLogData] = useState<LogPage | null>(null);
   const [logPage, setLogPage] = useState(1);
@@ -65,7 +79,7 @@ export function AdminPage() {
   useEffect(() => {
     api.get<Stats>("/api/admin/stats").then((s) => {
       setBadges({
-        users: s.pending.accounts,
+        users: s.pending.accounts + s.pending.usernameChanges,
         newspapers: s.pending.newspapers,
         events: s.pending.events,
         moderation: s.pending.moderationReviews,
@@ -75,8 +89,11 @@ export function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (tab === "stats") api.get<Stats>("/api/admin/stats").then((s) => { setStats(s); setBadges({ users: s.pending.accounts, newspapers: s.pending.newspapers, events: s.pending.events, moderation: s.pending.moderationReviews }); });
-    if (tab === "users") api.get<AdminUser[]>("/api/admin/users?status=pending").then(setPendingUsers);
+    if (tab === "stats") api.get<Stats>("/api/admin/stats").then((s) => { setStats(s); setBadges({ users: s.pending.accounts + s.pending.usernameChanges, newspapers: s.pending.newspapers, events: s.pending.events, moderation: s.pending.moderationReviews }); });
+    if (tab === "users") {
+      api.get<AdminUser[]>("/api/admin/users?status=pending").then(setPendingUsers);
+      api.get<UsernameChange[]>("/api/admin/username-changes").then(setUsernameChanges);
+    }
     if (tab === "moderation") api.get<Moditem[]>("/api/admin/moderation").then(setModItems);
     if (tab === "log") api.get<LogPage>(`/api/admin/log?page=${logPage}&limit=50`).then(setLogData);
   }, [tab, logPage]);
@@ -91,6 +108,16 @@ export function AdminPage() {
     await api.post(`/api/admin/users/${id}/reject`);
     setPendingUsers((u) => u.filter((x) => x.id !== id));
     setBadges((b) => ({ ...b, users: Math.max(0, b.users - 1) }));
+  }
+
+  async function approveUsernameChange(id: number) {
+    await api.post(`/api/admin/username-changes/${id}/approve`);
+    setUsernameChanges((c) => c.filter((x) => x.id !== id));
+  }
+
+  async function rejectUsernameChange(id: number) {
+    await api.post(`/api/admin/username-changes/${id}/reject`);
+    setUsernameChanges((c) => c.filter((x) => x.id !== id));
   }
 
   async function reinstate(type: string, id: number) {
@@ -141,6 +168,7 @@ export function AdminPage() {
           <div className="stats-pending">
             <h3>Pending</h3>
             <p>Accounts: {stats.pending.accounts}</p>
+            <p>Username changes: {stats.pending.usernameChanges}</p>
             <p>Newspapers: {stats.pending.newspapers}</p>
             <p>Events: {stats.pending.events}</p>
             <p>Moderation: {stats.pending.moderationReviews}</p>
@@ -160,19 +188,51 @@ export function AdminPage() {
             </div>
           ))}
           {pendingUsers.length === 0 && <p>No pending accounts.</p>}
+
+          <h3 style={{ marginTop: 24 }}>{t("admin.usernameChanges")} ({usernameChanges.length})</h3>
+          {usernameChanges.map((c) => (
+            <div key={c.id} className="card">
+              <span>{c.discord_display_name}</span>
+              <span style={{ color: "var(--text-muted)" }}>
+                {" "}· <code>{c.current_mc_username ?? "—"}</code> → <code>{c.requested_mc_username}</code>
+              </span>
+              {c.reason && <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "4px 0" }}><em>{c.reason}</em></p>}
+              <button onClick={() => approveUsernameChange(c.id)}>{t("admin.approve")}</button>
+              <button onClick={() => rejectUsernameChange(c.id)}>{t("admin.reject")}</button>
+            </div>
+          ))}
+          {usernameChanges.length === 0 && <p>No pending username changes.</p>}
         </div>
       )}
 
       {tab === "moderation" && (
         <div>
           <h3>{t("admin.moderation")}</h3>
-          {modItems.map((item) => (
-            <div key={`${item.type}-${item.id}`} className="card">
-              <span className="badge">{item.type}</span> {item.title}
-              <button onClick={() => reinstate(item.type, item.id)}>{t("admin.reinstate")}</button>
-              <button className="btn-danger" onClick={() => remove(item.type, item.id)}>{t("admin.remove")}</button>
-            </div>
-          ))}
+          {modItems.map((item) => {
+            // Open-page target: the newspaper itself, or the newspaper that owns
+            // the reported article. Events have no detail page.
+            const npId = item.type === "newspaper" ? item.id : item.newspaper_id;
+            return (
+              <div key={`${item.type}-${item.id}`} className="card">
+                <div style={{ marginBottom: 6 }}>
+                  <span className="badge">{item.type}</span>{" "}
+                  <strong>{item.title}</strong>
+                  {item.newspaper_name && item.type === "article" && (
+                    <span style={{ color: "var(--text-muted)" }}> · {t("admin.inNewspaper", { name: item.newspaper_name })}</span>
+                  )}
+                </div>
+                <div className="form-actions">
+                  {npId != null && (
+                    <Link className="btn-small btn-secondary" to={`/newspapers/${npId}`} target="_blank" rel="noreferrer">
+                      {t("admin.openPage")}
+                    </Link>
+                  )}
+                  <button className="btn-small" onClick={() => reinstate(item.type, item.id)}>{t("admin.reinstate")}</button>
+                  <button className="btn-small btn-danger" onClick={() => remove(item.type, item.id)}>{t("admin.remove")}</button>
+                </div>
+              </div>
+            );
+          })}
           {modItems.length === 0 && <p>No items pending moderation.</p>}
         </div>
       )}
@@ -194,13 +254,29 @@ const ACTION_META: Record<string, { label: string; color: string }> = {
   "user.approve":        { label: "approved",    color: "#2a7a2a" },
   "user.reject":         { label: "rejected",    color: "#8c2a2a" },
   "user.delete":         { label: "user×",       color: "#8c2a2a" },
-  "user.username_change":{ label: "mc-name",     color: "#5865f2" },
+  "user.username_set":   { label: "mc-set",      color: "#5865f2" },
+  "user.username_change_request": { label: "mc-req",  color: "#888" },
+  "user.username_change_approve": { label: "mc-name+", color: "#2a7a2a" },
+  "user.username_change_reject":  { label: "mc-name×", color: "#8c2a2a" },
   "user.verify":         { label: "verified",    color: "#5865f2" },
   "user.verify_request": { label: "verify-req",  color: "#888" },
   "newspaper.approve":   { label: "news+",       color: "#2a7a2a" },
   "newspaper.reject":    { label: "news×",       color: "#8c2a2a" },
+  "newspaper.hide":      { label: "news-hide",   color: "#a06a2a" },
+  "newspaper.unhide":    { label: "news-show",   color: "#5865f2" },
+  "newspaper.archive":   { label: "news-arch",   color: "#a06a2a" },
+  "newspaper.unarchive": { label: "news-unarch", color: "#5865f2" },
+  "article.publish":     { label: "article+",    color: "#3a8c3a" },
+  "article.hide":        { label: "art-hide",    color: "#a06a2a" },
+  "article.unhide":      { label: "art-show",    color: "#5865f2" },
+  "article.delete":      { label: "article×",    color: "#8c2a2a" },
   "event.approve":       { label: "event+",      color: "#2a7a2a" },
   "event.reject":        { label: "event×",      color: "#8c2a2a" },
+  "event.hide":          { label: "event-hide",  color: "#a06a2a" },
+  "event.delete":        { label: "event×",      color: "#8c2a2a" },
+  "report.add":          { label: "report",      color: "#c0392b" },
+  "report.remove":       { label: "unreport",    color: "#888" },
+  "moderation.autohide": { label: "auto-hide",   color: "#a06a2a" },
   "moderation.reinstate":{ label: "reinstate",   color: "#5865f2" },
   "moderation.remove":   { label: "removed",     color: "#8c2a2a" },
 };

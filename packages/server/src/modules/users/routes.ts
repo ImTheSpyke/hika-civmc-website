@@ -14,6 +14,7 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
     const u = req.sessionUser!
     return reply.send({
       id: u.id,
+      discordId: u.discordId,
       discordUsername: u.discordUsername,
       discordDisplayName: u.discordDisplayName,
       mcUsername: u.mcUsername,
@@ -24,23 +25,68 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  // Set/change mc_username
-  app.patch<{ Body: { mcUsername: string } }>(
-    "/api/me/username",
+  // Onboarding: set the mc_username for the FIRST time. Only works while the
+  // user has no username yet — afterwards changes go through an admin-approved
+  // request (see below). Username is stored case-sensitively.
+  app.post<{ Body: { mcUsername: string } }>(
+    "/api/me/onboard-username",
     { preHandler: requireAuth },
     async (req, reply) => {
-      const { mcUsername } = req.body;
-      if (!mcUsername || mcUsername.length > 16) {
+      const mcUsername = (req.body?.mcUsername ?? "").trim();
+      if (!mcUsername || mcUsername.length > 16 || !/^[A-Za-z0-9_]{1,16}$/.test(mcUsername)) {
         return reply.code(400).send({ error: { code: "error.invalidUsername", message: "Invalid username" } });
       }
       const userId = req.sessionUser!.id;
-      await query(
-        "UPDATE users SET mc_username = ?, mc_verified = FALSE WHERE id = ?",
+      // Guard against re-setting: only set if currently null.
+      const [result] = await query<RowDataPacket[]>(
+        "UPDATE users SET mc_username = ? WHERE id = ? AND mc_username IS NULL",
         [mcUsername, userId]
       );
+      if ((result as any).affectedRows === 0) {
+        return reply.code(409).send({ error: { code: "error.usernameAlreadySet", message: "Username already set" } });
+      }
       await backfillUsername(mcUsername, userId);
-      await adminLog(userId, "user.username_change", "user", userId, { mcUsername });
+      await adminLog(userId, "user.username_set", "user", userId, { mcUsername });
       return reply.send({ ok: true });
+    }
+  );
+
+  // Get the caller's pending username-change request, if any.
+  app.get("/api/me/username-change", { preHandler: requireAuth }, async (req, reply) => {
+    const [rows] = await query<RowDataPacket[]>(
+      `SELECT id, requested_mc_username as requestedMcUsername, reason, status, created_at as createdAt
+       FROM username_change_requests WHERE user_id = ? AND status = 'pending' LIMIT 1`,
+      [req.sessionUser!.id]
+    );
+    return reply.send(rows[0] ?? null);
+  });
+
+  // Submit an mc_username change request (admin-approved). At most one pending.
+  app.post<{ Body: { mcUsername: string; reason?: string } }>(
+    "/api/me/username-change",
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const mcUsername = (req.body?.mcUsername ?? "").trim();
+      if (!mcUsername || mcUsername.length > 16 || !/^[A-Za-z0-9_]{1,16}$/.test(mcUsername)) {
+        return reply.code(400).send({ error: { code: "error.invalidUsername", message: "Invalid username" } });
+      }
+      const userId = req.sessionUser!.id;
+      if (!req.sessionUser!.mcUsername) {
+        return reply.code(400).send({ error: { code: "error.invalidInput", message: "Set a username first via onboarding" } });
+      }
+      const [pending] = await query<RowDataPacket[]>(
+        "SELECT id FROM username_change_requests WHERE user_id = ? AND status = 'pending'",
+        [userId]
+      );
+      if (pending.length) {
+        return reply.code(409).send({ error: { code: "error.changeRequestPending", message: "You already have a pending change request" } });
+      }
+      const [result] = await query<RowDataPacket[]>(
+        "INSERT INTO username_change_requests (user_id, requested_mc_username, reason) VALUES (?, ?, ?)",
+        [userId, mcUsername, req.body?.reason ?? ""]
+      );
+      await adminLog(userId, "user.username_change_request", "user", userId, { mcUsername });
+      return reply.code(201).send({ id: (result as any).insertId });
     }
   );
 

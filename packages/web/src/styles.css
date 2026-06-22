@@ -137,7 +137,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 /* Article */
 .article { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 20px; }
 .article-date { font-size: 13px; color: var(--text-muted); }
-.article-body { margin: 12px 0; white-space: pre-wrap; }
+.article-body { margin: 12px 0; }
 .coords { font-size: 13px; color: var(--text-muted); font-family: monospace; }
 
 /* Countdown */
@@ -211,4 +211,63 @@ input[type="datetime-local"] { color-scheme: dark; }
   .player-notes-layout { grid-template-columns: 1fr; }
   .player-notes-sidebar { border-right: none; border-bottom: 1px solid var(--border); padding-right: 0; padding-bottom: 16px; }
   .form-row { flex-direction: column; }
+}
+
+/* Reported state for the report toggle */
+button.btn-reported { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+button.btn-reported:hover { background: var(--danger); color: #fff; }
+
+/* Archived newspaper badge */
+.badge-archived { background: var(--system); color: #000; }
+
+/* Markdown rendering — links and images are intentionally not produced. */
+.markdown { line-height: 1.55; word-break: break-word; }
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown p { margin: 0 0 10px; }
+.markdown h1, .markdown h2, .markdown h3,
+.markdown h4, .markdown h5, .markdown h6 { margin: 16px 0 8px; line-height: 1.25; }
+.markdown h1 { font-size: 1.5em; }
+.markdown h2 { font-size: 1.3em; }
+.markdown h3 { font-size: 1.15em; }
+.markdown h4, .markdown h5, .markdown h6 { font-size: 1em; }
+.markdown ul, .markdown ol { margin: 0 0 10px; padding-left: 22px; }
+.markdown li { margin: 2px 0; }
+.markdown blockquote {
+  margin: 0 0 10px; padding: 4px 12px;
+  border-left: 3px solid var(--border); color: var(--text-muted);
+}
+.markdown code {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 4px; padding: 1px 5px; font-size: 0.9em;
+}
+.markdown pre {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 12px; overflow: auto; margin: 0 0 10px;
+}
+.markdown pre code { background: none; border: none; padding: 0; }
+.markdown hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+/* Edit/Preview toolbar for note editors */
+.editor-toolbar { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.editor-toolbar button {
+  background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+  padding: 4px 12px; font-size: 13px;
+}
+.editor-toolbar button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.markdown-hint { font-size: 12px; color: var(--text-muted); margin-left: auto; }
+.markdown-note {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px;
+}
+.markdown-note .empty { color: var(--text-muted); }
+
+/* Article publish preview */
+.markdown-preview {
+  border: 1px dashed var(--border); border-radius: var(--radius);
+  padding: 12px; margin: 8px 0;
+}
+.markdown-preview-label {
+  display: block; font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 6px;
 }

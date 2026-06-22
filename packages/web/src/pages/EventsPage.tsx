@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../api/client.js";
 import { useI18n } from "../i18n/context.js";
+import { useAuth } from "../lib/auth.js";
+import { ConfirmDialog } from "../components/ConfirmDialog.js";
+import { ReportToggle } from "../components/ReportToggle.js";
+import { Markdown } from "../components/Markdown.js";
 import type { Event } from "../api/types.js";
 
 function formatCountdown(target: Date): string {
@@ -24,24 +28,17 @@ function Countdown({ target }: { target: string }) {
   return <span className="countdown">{display}</span>;
 }
 
-function ReportButton({ onClick }: { onClick: () => void }) {
-  const { t } = useI18n();
-  return (
-    <button
-      className="btn-small btn-report report-corner"
-      onClick={onClick}
-      title={t("events.report")}
-    >
-      ⚑
-    </button>
-  );
-}
-
 const EMPTY_FORM = { name: "", description: "", startsAt: "", durationMinutes: "60", x: "", y: "", z: "" };
 
 export function EventsPage() {
   const { t } = useI18n();
+  const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
+  const [confirm, setConfirm] = useState<
+    | { kind: "hide" | "delete"; ev: Event }
+    | null
+  >(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
   const [myPending, setMyPending] = useState<Event[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -96,6 +93,22 @@ export function EventsPage() {
     setForm(EMPTY_FORM);
     setErrors({});
     setSubmitError("");
+  }
+
+  async function runConfirm() {
+    if (!confirm) return;
+    setConfirmBusy(true);
+    try {
+      if (confirm.kind === "delete") {
+        await api.delete(`/api/events/${confirm.ev.id}`);
+      } else {
+        await api.patch(`/api/events/${confirm.ev.id}/hide`);
+      }
+      setConfirm(null);
+      loadAll();
+    } finally {
+      setConfirmBusy(false);
+    }
   }
 
   return (
@@ -193,7 +206,7 @@ export function EventsPage() {
       {systemEvents.map((e) => (
         <div key={e.id} className="card card-system">
           <h3>⚔ {e.name}</h3>
-          <p>{e.description}</p>
+          {e.description && <Markdown>{e.description}</Markdown>}
           <p>{t("events.nextIn", { time: "" })} <Countdown target={e.starts_at} /></p>
         </div>
       ))}
@@ -202,20 +215,49 @@ export function EventsPage() {
         <p style={{ color: "var(--text-muted)" }}>{t("events.noEvents")}</p>
       )}
 
-      {regularEvents.map((e) => (
-        <div key={e.id} className="card" style={{ position: "relative" }}>
-          <ReportButton onClick={() => api.post("/api/reports", { targetType: "event", targetId: e.id })} />
-          <h3>{e.name}</h3>
-          <p>{e.description}</p>
-          <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
-            {new Date(e.starts_at).toLocaleString()} · {e.duration_minutes} min
-          </p>
-          {e.x != null && (
-            <p className="coords">{t("events.coordsLabel", { x: e.x!, y: e.y!, z: e.z! })}</p>
-          )}
-          <Countdown target={e.starts_at} />
-        </div>
-      ))}
+      {regularEvents.map((e) => {
+        const canManage = e.mine || user?.isAdmin;
+        return (
+          <div key={e.id} className="card" style={{ position: "relative" }}>
+            <ReportToggle targetType="event" targetId={e.id} reported={!!e.reported} />
+            <h3>{e.name}</h3>
+            {e.description && <Markdown>{e.description}</Markdown>}
+            <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
+              {new Date(e.starts_at).toLocaleString()} · {e.duration_minutes} min
+            </p>
+            {e.x != null && (
+              <p className="coords">{t("events.coordsLabel", { x: e.x!, y: e.y!, z: e.z! })}</p>
+            )}
+            <Countdown target={e.starts_at} />
+            {canManage && (
+              <div className="form-actions" style={{ marginTop: 10 }}>
+                <button className="btn-small btn-secondary" onClick={() => setConfirm({ kind: "hide", ev: e })}>
+                  {t("events.hide")}
+                </button>
+                <button className="btn-small btn-danger" onClick={() => setConfirm({ kind: "delete", ev: e })}>
+                  {t("common.delete")}
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {confirm && (
+        <ConfirmDialog
+          title={confirm.kind === "delete" ? t("events.confirmDeleteTitle") : t("events.confirmHideTitle")}
+          message={
+            confirm.kind === "delete"
+              ? t("events.confirmDeleteBody", { name: confirm.ev.name })
+              : t("events.confirmHideBody", { name: confirm.ev.name })
+          }
+          confirmLabel={confirm.kind === "delete" ? t("common.delete") : t("events.hide")}
+          danger={confirm.kind === "delete"}
+          busy={confirmBusy}
+          onConfirm={runConfirm}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
     </div>
   );
 }

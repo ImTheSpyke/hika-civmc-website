@@ -1,5 +1,6 @@
 export interface Me {
   id: number;
+  discordId: string;
   discordUsername: string;
   discordDisplayName: string;
   mcUsername: string | null;
@@ -43,6 +44,10 @@ export interface Newspaper {
   name: string;
   description: string;
   status?: "pending" | "approved" | "rejected";
+  active?: boolean;
+  archived?: boolean;
+  mine?: boolean;
+  reported?: boolean;
   created_at: string;
 }
 
@@ -50,6 +55,8 @@ export interface Article {
   id: number;
   title: string;
   body: string;
+  active?: boolean;
+  reported?: boolean;
   published_at: string;
 }
 
@@ -63,6 +70,8 @@ export interface Event {
   y: number | null;
   z: number | null;
   isSystem: boolean;
-  status: "pending" | "approved" | "rejected";
+  status?: "pending" | "approved" | "rejected";
+  mine?: boolean;
+  reported?: boolean;
   created_at: string;
 }

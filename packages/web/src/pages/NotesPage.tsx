@@ -3,6 +3,7 @@ import { api } from "../api/client.js";
 import { useI18n } from "../i18n/context.js";
 import type { PlayerNote, Tag, UserResult } from "../api/types.js";
 import { Avatar } from "../components/Avatar.js";
+import { Markdown } from "../components/Markdown.js";
 
 const MAX = 5000;
 const DEBOUNCE_MS = 2000;
@@ -14,6 +15,7 @@ type ActiveTab = "global" | "players";
 function GlobalNotes() {
   const { t } = useI18n();
   const [body, setBody] = useState("");
+  const [preview, setPreview] = useState(false);
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSaved = useRef("");
@@ -48,13 +50,24 @@ function GlobalNotes() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <textarea
-        value={body}
-        onChange={handleChange}
-        onBlur={() => { if (timerRef.current) clearTimeout(timerRef.current); save(body); }}
-        placeholder={t("globalNotes.placeholder")}
-        style={{ flex: 1, width: "100%", resize: "none", minHeight: 400 }}
-      />
+      <div className="editor-toolbar">
+        <button className={preview ? "" : "active"} onClick={() => setPreview(false)}>{t("common.edit")}</button>
+        <button className={preview ? "active" : ""} onClick={() => setPreview(true)}>{t("common.preview")}</button>
+        <span className="markdown-hint">{t("common.markdownSupported")}</span>
+      </div>
+      {preview ? (
+        <div className="markdown markdown-note" style={{ flex: 1, minHeight: 400, overflow: "auto" }}>
+          {body.trim() ? <Markdown>{body}</Markdown> : <p className="empty">{t("common.noResults")}</p>}
+        </div>
+      ) : (
+        <textarea
+          value={body}
+          onChange={handleChange}
+          onBlur={() => { if (timerRef.current) clearTimeout(timerRef.current); save(body); }}
+          placeholder={t("globalNotes.placeholder")}
+          style={{ flex: 1, width: "100%", resize: "none", minHeight: 400 }}
+        />
+      )}
       <div className="notes-footer">
         <span>{t("globalNotes.chars", { count: body.length, max: MAX })}</span>
         <span>
@@ -77,6 +90,7 @@ function PlayerNotes() {
   const [searchResults, setSearchResults] = useState<UserResult[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [noteBody, setNoteBody] = useState("");
+  const [preview, setPreview] = useState(false);
   const [rawUsername, setRawUsername] = useState("");
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,6 +116,7 @@ function PlayerNotes() {
 
   async function selectPlayer(mcUsername: string) {
     setSelected(mcUsername);
+    setPreview(false);
     setSearch("");
     setSearchResults([]);
     try {
@@ -202,13 +217,24 @@ function PlayerNotes() {
         {selected ? (
           <>
             <h3 style={{ marginBottom: 10 }}>{selected}</h3>
-            <textarea
-              value={noteBody}
-              onChange={(e) => handleNoteChange(e.target.value)}
-              onBlur={() => saveNote(noteBody)}
-              placeholder={t("playerNotes.notePlaceholder")}
-              style={{ width: "100%", resize: "vertical", minHeight: 300 }}
-            />
+            <div className="editor-toolbar">
+              <button className={preview ? "" : "active"} onClick={() => setPreview(false)}>{t("common.edit")}</button>
+              <button className={preview ? "active" : ""} onClick={() => setPreview(true)}>{t("common.preview")}</button>
+              <span className="markdown-hint">{t("common.markdownSupported")}</span>
+            </div>
+            {preview ? (
+              <div className="markdown markdown-note" style={{ width: "100%", minHeight: 300 }}>
+                {noteBody.trim() ? <Markdown>{noteBody}</Markdown> : <p className="empty">{t("common.noResults")}</p>}
+              </div>
+            ) : (
+              <textarea
+                value={noteBody}
+                onChange={(e) => handleNoteChange(e.target.value)}
+                onBlur={() => saveNote(noteBody)}
+                placeholder={t("playerNotes.notePlaceholder")}
+                style={{ width: "100%", resize: "vertical", minHeight: 300 }}
+              />
+            )}
           </>
         ) : (
           <p className="empty" style={{ color: "var(--text-muted)", paddingTop: 40 }}>{t("playerNotes.searchPlaceholder")}</p>

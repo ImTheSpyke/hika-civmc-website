@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { requireAuth } from "../../auth/session.js";
+import { requireOnboarded } from "../../auth/session.js";
 import { query } from "../../db.js";
 import type { RowDataPacket } from "mysql2";
 
@@ -11,7 +11,7 @@ function randomColor(): string {
 
 export async function tagsRoutes(app: FastifyInstance): Promise<void> {
   // List the user's tags
-  app.get("/api/tags", { preHandler: requireAuth }, async (req, reply) => {
+  app.get("/api/tags", { preHandler: requireOnboarded }, async (req, reply) => {
     const [rows] = await query<RowDataPacket[]>(
       "SELECT id, name, color FROM tags WHERE owner_id = ? ORDER BY name",
       [req.sessionUser!.id]
@@ -22,7 +22,7 @@ export async function tagsRoutes(app: FastifyInstance): Promise<void> {
   // Create a tag
   app.post<{ Body: { name: string; color?: string } }>(
     "/api/tags",
-    { preHandler: requireAuth },
+    { preHandler: requireOnboarded },
     async (req, reply) => {
       const ownerId = req.sessionUser!.id;
       const [[{ count }]] = await query<RowDataPacket[]>(
@@ -47,7 +47,7 @@ export async function tagsRoutes(app: FastifyInstance): Promise<void> {
   // Edit a tag
   app.patch<{ Params: { id: string }; Body: { name?: string; color?: string } }>(
     "/api/tags/:id",
-    { preHandler: requireAuth },
+    { preHandler: requireOnboarded },
     async (req, reply) => {
       const id = parseInt(req.params.id, 10);
       const [rows] = await query<RowDataPacket[]>(
@@ -65,7 +65,7 @@ export async function tagsRoutes(app: FastifyInstance): Promise<void> {
   // Delete a tag and its assignments
   app.delete<{ Params: { id: string } }>(
     "/api/tags/:id",
-    { preHandler: requireAuth },
+    { preHandler: requireOnboarded },
     async (req, reply) => {
       await query(
         "DELETE FROM tags WHERE id = ? AND owner_id = ?",
@@ -78,7 +78,7 @@ export async function tagsRoutes(app: FastifyInstance): Promise<void> {
   // Assign a tag to a player
   app.post<{ Params: { id: string }; Body: { username: string } }>(
     "/api/tags/:id/assign",
-    { preHandler: requireAuth },
+    { preHandler: requireOnboarded },
     async (req, reply) => {
       const tagId = parseInt(req.params.id, 10);
       const [owned] = await query<RowDataPacket[]>(
@@ -106,7 +106,7 @@ export async function tagsRoutes(app: FastifyInstance): Promise<void> {
   // Detach a tag from a player
   app.delete<{ Params: { id: string; username: string } }>(
     "/api/tags/:id/assign/:username",
-    { preHandler: requireAuth },
+    { preHandler: requireOnboarded },
     async (req, reply) => {
       const tagId = parseInt(req.params.id, 10);
       const [owned] = await query<RowDataPacket[]>(
@@ -125,7 +125,7 @@ export async function tagsRoutes(app: FastifyInstance): Promise<void> {
   // Players carrying a tag
   app.get<{ Params: { id: string } }>(
     "/api/players/by-tag/:id",
-    { preHandler: requireAuth },
+    { preHandler: requireOnboarded },
     async (req, reply) => {
       const tagId = parseInt(req.params.id, 10);
       const [owned] = await query<RowDataPacket[]>(

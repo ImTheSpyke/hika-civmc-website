@@ -75,6 +75,22 @@ export async function requireAuth(
   }
 }
 
+/**
+ * For feature routes that should be unreachable until the user has completed
+ * onboarding (set their Minecraft username). Admins are exempt so they can
+ * always operate. Mirrors the client-side onboarding gate for defense in depth.
+ */
+export async function requireOnboarded(
+  req: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  await requireAuth(req, reply);
+  if (reply.sent) return;
+  if (!req.sessionUser!.isAdmin && !req.sessionUser!.mcUsername) {
+    return reply.code(403).send({ error: { code: "error.onboardingRequired", message: "Set your Minecraft username first" } });
+  }
+}
+
 export async function requireAdmin(
   req: FastifyRequest,
   reply: FastifyReply

@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from "./lib/auth.js";
 import { LanguageProvider } from "./i18n/context.js";
 import { Nav } from "./components/Nav.js";
 import { LoginPage } from "./pages/LoginPage.js";
+import { OnboardingPage } from "./pages/OnboardingPage.js";
+import { ProfilePage } from "./pages/ProfilePage.js";
 import { NotesPage } from "./pages/NotesPage.js";
 import {
   NewspapersPage,
@@ -11,13 +13,7 @@ import {
 } from "./pages/NewspapersPage.js";
 import { EventsPage } from "./pages/EventsPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
-
-function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  if (loading) return <div className="page-center">Loading…</div>;
-  if (!user || user.status !== "approved") return <LoginPage />;
-  return <>{children}</>;
-}
+import { NotFoundPage } from "./pages/NotFoundPage.js";
 
 function RequireAdmin({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -31,17 +27,22 @@ function AppRoutes() {
   if (loading) return <div className="page-center">Loading…</div>;
   if (!user || user.status !== "approved") return <LoginPage />;
 
+  // Onboarding gate: approved users with no Minecraft username are forced to the
+  // onboarding page and cannot reach any other route until they set one.
+  if (!user.mcUsername) return <OnboardingPage />;
+
   return (
     <>
       <Nav />
       <Routes>
         <Route path="/" element={<Navigate to="/notes" />} />
-        <Route path="/notes" element={<RequireAuth><NotesPage /></RequireAuth>} />
+        <Route path="/notes" element={<NotesPage />} />
         <Route path="/players" element={<Navigate to="/notes" />} />
-        <Route path="/newspapers" element={<RequireAuth><NewspapersPage /></RequireAuth>} />
-        <Route path="/newspapers/:id" element={<RequireAuth><NewspaperDetailPage /></RequireAuth>} />
-        <Route path="/newspapers/:id/manage" element={<RequireAuth><NewspaperManagePage /></RequireAuth>} />
-        <Route path="/events" element={<RequireAuth><EventsPage /></RequireAuth>} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/newspapers" element={<NewspapersPage />} />
+        <Route path="/newspapers/:id" element={<NewspaperDetailPage />} />
+        <Route path="/newspapers/:id/manage" element={<NewspaperManagePage />} />
+        <Route path="/events" element={<EventsPage />} />
         <Route
           path="/admin/*"
           element={
@@ -50,6 +51,7 @@ function AppRoutes() {
             </RequireAdmin>
           }
         />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </>
   );

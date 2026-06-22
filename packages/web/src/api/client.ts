@@ -1,4 +1,5 @@
 export class ApiError extends Error {
+  retryMs?: number;
   constructor(public code: string, message: string, public status: number) {
     super(message);
   }
@@ -21,11 +22,14 @@ async function request<T>(
   if (!res.ok) {
     let code = "error.unknown";
     let message = res.statusText;
+    let retryMs: number | undefined;
     try {
-      const body = await res.json() as { error?: { code: string; message: string } };
-      if (body.error) { code = body.error.code; message = body.error.message; }
+      const body = await res.json() as { error?: { code: string; message: string; retryMs?: number } };
+      if (body.error) { code = body.error.code; message = body.error.message; retryMs = body.error.retryMs; }
     } catch { /* ignore */ }
-    throw new ApiError(code, message, res.status);
+    const err = new ApiError(code, message, res.status);
+    err.retryMs = retryMs;
+    throw err;
   }
 
   if (res.status === 204) return undefined as T;

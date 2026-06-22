@@ -42,8 +42,10 @@ export function Nav() {
             ))}
           </select>
         )}
-        <Avatar mcUsername={user.mcUsername} size={24} />
-        <span>{user.discordDisplayName}</span>
+        <Link to="/profile" style={{ display: "flex", alignItems: "center", gap: 6, textDecoration: "none" }}>
+          <Avatar mcUsername={user.mcUsername} size={24} />
+          <span>{user.discordDisplayName}</span>
+        </Link>
         <button onClick={() => logout()}>{t("nav.logout")}</button>
       </div>
     </nav>
