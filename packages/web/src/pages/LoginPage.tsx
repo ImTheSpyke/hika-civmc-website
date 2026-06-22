@@ -51,6 +51,16 @@ export function LoginPage() {
 
   return (
     <div className="landing">
+      {/* ── Invasion banner ── */}
+      <section className="landing-invasion">
+        <div className="landing-invasion-inner">
+          <span className="landing-invasion-label">⚠ MENACE IMMINENTE</span>
+          <p className="landing-invasion-text">
+            L'invasion IA approche. Préparez vos défenses. Coordonnez vos alliances.
+            <strong> Ceux qui sont organisés survivront.</strong>
+          </p>
+        </div>
+      </section>
 
       {/* ── Hero ── */}
       <section className="landing-hero">
@@ -93,21 +103,11 @@ export function LoginPage() {
         />
         <FeatureCard
           icon="⚔️"
-          title="Événements & Raids"
-          body="Planifiez des raids, des réunions de faction ou des sieges. Coordonnez avec vos alliés. Ne ratez plus jamais un événement critique."
+          title="Événements & Rassemblements"
+          body="Planifiez des événements, des réunions de faction ou des jeux. Ne ratez plus jamais un événement critique."
         />
       </section>
 
-      {/* ── Invasion banner ── */}
-      <section className="landing-invasion">
-        <div className="landing-invasion-inner">
-          <span className="landing-invasion-label">⚠ MENACE IMMINENTE</span>
-          <p className="landing-invasion-text">
-            L'invasion IA approche. Préparez vos défenses. Coordonnez vos alliances.
-            <strong> Ceux qui sont organisés survivront.</strong>
-          </p>
-        </div>
-      </section>
 
       {/* ── Footer CTA ── */}
       <section className="landing-footer-cta">
