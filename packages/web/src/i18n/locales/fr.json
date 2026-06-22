@@ -49,6 +49,9 @@
   "notes.sortUsername": "Pseudo",
   "notes.sortTag": "Tag",
   "notes.clearFilter": "Effacer",
+  "notes.casingConflict.body": "Une note pour « {existing} » existe déjà. « {typed} » ne diffère que par la casse — est-ce le même joueur ?",
+  "notes.casingConflict.useExisting": "Ouvrir « {name} »",
+  "notes.casingConflict.createNew": "Créer une nouvelle note pour « {name} »",
 
   "tags.title": "Tags",
   "tags.create": "Nouveau tag",

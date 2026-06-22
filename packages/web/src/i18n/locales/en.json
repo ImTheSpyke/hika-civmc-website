@@ -49,6 +49,9 @@
   "notes.sortUsername": "Username",
   "notes.sortTag": "Tag",
   "notes.clearFilter": "Clear",
+  "notes.casingConflict.body": "A note for \"{existing}\" already exists. \"{typed}\" differs only in casing — is this the same player?",
+  "notes.casingConflict.useExisting": "Open \"{name}\"",
+  "notes.casingConflict.createNew": "Create new note for \"{name}\"",
 
   "tags.title": "Tags",
   "tags.create": "New tag",

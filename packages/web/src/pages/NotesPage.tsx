@@ -286,12 +286,14 @@ function Sidebar({
           <ul className="search-results">
             {searchResults.map((u) => (
               <li
-                key={u.userId}
+                key={u.userId !== -1 ? `u-${u.userId}` : `raw-${u.mcUsername}`}
                 onClick={() => onPickSearchResult(u.mcUsername ?? u.discordUsername)}
               >
                 <Avatar mcUsername={u.mcUsername} size={22} />
                 {u.mcUsername && <span style={{ flex: 1 }}>{u.mcUsername}</span>}
-                <span className="mc-name">@{u.discordUsername}</span>
+                {u.discordUsername && (
+                  <span className="mc-name">@{u.discordUsername}</span>
+                )}
               </li>
             ))}
           </ul>
@@ -521,6 +523,12 @@ export function NotesPage() {
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<UserResult[]>([]);
   const [filterTags, setFilterTags] = useState<number[]>([]);
+
+  // Casing conflict popup: typed name differs in case from an existing note
+  const [casingConflict, setCasingConflict] = useState<{
+    typed: string;
+    existing: string;
+  } | null>(null);
   const [sort, setSort] = useState<SortKey>("updated");
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -562,8 +570,10 @@ export function NotesPage() {
 
   const entries: PlayerEntry[] = notes
     .filter((n) => {
-      if (filterTags.length === 0) return true;
+      // Hide empty, untagged entries (placeholder notes created by the search flow)
       const tags = tagMap[n.mcUsername] ?? [];
+      if (!n.body.trim() && tags.length === 0) return false;
+      if (filterTags.length === 0) return true;
       // must have ALL selected filter tags
       return filterTags.every((id) => tags.some((t) => t.id === id));
     })
@@ -598,7 +608,27 @@ export function NotesPage() {
     const trimmed = q.trim();
     if (!trimmed) { setSearchResults([]); return; }
 
-    const all = allUsers.current
+    // Real registered users
+    const linkedUsernames = new Set(
+      allUsers.current.map((u) => u.mcUsername?.toLowerCase()).filter(Boolean)
+    );
+
+    // Synthetic entries for notes that have no linked account
+    const unlinkedSynthetics: UserResult[] = notes
+      .filter((n) => !n.resolvedUser && !linkedUsernames.has(n.mcUsername.toLowerCase()))
+      .map((n) => ({
+        userId: -1,
+        discordUsername: "",
+        discordDisplayName: "",
+        mcUsername: n.mcUsername,
+        mcVerified: false,
+        publicFactionTag: null,
+        avatarUrl: null,
+      }));
+
+    const candidates = [...allUsers.current, ...unlinkedSynthetics];
+
+    const all = candidates
       .map((u) => ({ u, score: scoreUser(trimmed, u) }))
       .sort((a, b) => b.score - a.score);
 
@@ -656,11 +686,36 @@ export function NotesPage() {
   async function addRawUsername(u: string) {
     setSearch("");
     setSearchResults([]);
-    if (!notes.some((n) => n.mcUsername === u)) {
-      await api.put(`/api/player-notes/${encodeURIComponent(u)}`, { body: "" });
-      await loadData();
+
+    // Check for an existing note with the same username (case-insensitive)
+    const existing = notes.find((n) => n.mcUsername.toLowerCase() === u.toLowerCase());
+    if (existing) {
+      if (existing.mcUsername === u) {
+        // Exact same casing — just open it silently
+        await selectPlayer(existing.mcUsername);
+      } else {
+        // Different casing — ask the user what to do
+        setCasingConflict({ typed: u, existing: existing.mcUsername });
+      }
+      return;
     }
+
+    await api.put(`/api/player-notes/${encodeURIComponent(u)}`, { body: "" });
+    await loadData();
     await selectPlayer(u);
+  }
+
+  async function resolveCasingConflict(choice: "existing" | "new") {
+    if (!casingConflict) return;
+    const { typed, existing } = casingConflict;
+    setCasingConflict(null);
+    if (choice === "existing") {
+      await selectPlayer(existing);
+    } else {
+      await api.put(`/api/player-notes/${encodeURIComponent(typed)}`, { body: "" });
+      await loadData();
+      await selectPlayer(typed);
+    }
   }
 
   // ── note saving ───────────────────────────────────────────────────────────
@@ -740,6 +795,31 @@ export function NotesPage() {
   return (
     <div className="notes-page-wrap">
       <GlobalNotepad />
+
+      {/* Casing conflict modal */}
+      {casingConflict && (
+        <div className="modal-overlay">
+          <div className="modal-box">
+            <p style={{ marginTop: 0 }}>
+              {t("notes.casingConflict.body", {
+                typed: casingConflict.typed,
+                existing: casingConflict.existing,
+              })}
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button onClick={() => resolveCasingConflict("existing")}>
+                {t("notes.casingConflict.useExisting", { name: casingConflict.existing })}
+              </button>
+              <button className="btn-secondary" onClick={() => resolveCasingConflict("new")}>
+                {t("notes.casingConflict.createNew", { name: casingConflict.typed })}
+              </button>
+              <button className="btn-ghost" onClick={() => setCasingConflict(null)}>
+                {t("common.cancel")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="notes-layout">
         <Sidebar
