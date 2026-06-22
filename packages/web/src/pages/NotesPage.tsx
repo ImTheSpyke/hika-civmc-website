@@ -173,6 +173,7 @@ function GlobalNotepad() {
 interface PlayerEntry {
   mcUsername: string;
   displayName: string;
+  discordUsername: string | null;
   hasNote: boolean;
   noteSnippet: string;
   updatedAt: string | null;
@@ -281,8 +282,8 @@ function Sidebar({
                 onClick={() => onPickSearchResult(u.mcUsername ?? u.discordUsername)}
               >
                 <Avatar mcUsername={u.mcUsername} size={22} />
-                <span style={{ flex: 1 }}>{u.discordDisplayName}</span>
-                {u.mcUsername && <span className="mc-name">({u.mcUsername})</span>}
+                <span style={{ flex: 1 }}>@{u.discordUsername}</span>
+                {u.mcUsername && <span className="mc-name">{u.mcUsername}</span>}
               </li>
             ))}
           </ul>
@@ -359,8 +360,8 @@ function Sidebar({
                 {e.mcUsername}
                 {e.verified && <span className="badge" style={{ marginLeft: 4, fontSize: 9 }}>✓</span>}
               </span>
-              {e.displayName !== e.mcUsername && (
-                <span className="noted-player-discord">{e.displayName}</span>
+              {e.discordUsername && (
+                <span className="noted-player-discord">@{e.discordUsername}</span>
               )}
               {e.tags.length > 0 && (
                 <div className="noted-player-tags">
@@ -397,6 +398,7 @@ function Sidebar({
 
 interface EditorPanelProps {
   mcUsername: string;
+  discordUsername: string | null;
   allTags: Tag[];
   playerTags: Tag[];
   noteBody: string;
@@ -409,6 +411,7 @@ interface EditorPanelProps {
 
 function EditorPanel({
   mcUsername,
+  discordUsername,
   allTags,
   playerTags,
   noteBody,
@@ -428,6 +431,9 @@ function EditorPanel({
       <div className="editor-player-header">
         <Avatar mcUsername={mcUsername} size={36} />
         <h3 style={{ margin: 0, flex: 1 }}>{mcUsername}</h3>
+        {discordUsername && (
+          <span style={{ fontSize: 13, color: "var(--text-muted)" }}>@{discordUsername}</span>
+        )}
         {saveStatus === "saving" && (
           <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{t("common.saving")}</span>
         )}
@@ -498,6 +504,7 @@ export function NotesPage() {
 
   // UI state
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedDiscordName, setSelectedDiscordName] = useState<string | null>(null);
   const [noteBody, setNoteBody] = useState("");
   const [playerTags, setPlayerTags] = useState<Tag[]>([]);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -555,6 +562,9 @@ export function NotesPage() {
     .map((n) => ({
       mcUsername: n.mcUsername,
       displayName: n.resolvedUser?.discordDisplayName ?? n.mcUsername,
+      discordUsername: n.resolvedUser
+        ? (allUsers.current.find((u) => u.mcUsername === n.mcUsername)?.discordUsername ?? null)
+        : null,
       hasNote: Boolean(n.body),
       noteSnippet: n.body.replace(/[#*_`>]/g, "").slice(0, 60),
       updatedAt: n.updatedAt,
@@ -597,6 +607,10 @@ export function NotesPage() {
     setSearch("");
     setSearchResults([]);
     setSaveStatus("idle");
+    // Resolve discord username from allUsers list
+    const discordName = allUsers.current.find((u) => u.mcUsername === mcUsername)?.discordUsername
+      ?? null;
+    setSelectedDiscordName(discordName);
 
     try {
       const note = await api.get<{ body: string }>(
@@ -675,6 +689,7 @@ export function NotesPage() {
     await api.delete(`/api/player-notes/${encodeURIComponent(mcUsername)}`);
     if (selected === mcUsername) {
       setSelected(null);
+      setSelectedDiscordName(null);
       setNoteBody("");
       setPlayerTags([]);
     }
@@ -739,6 +754,7 @@ export function NotesPage() {
           {selected ? (
             <EditorPanel
               mcUsername={selected}
+              discordUsername={selectedDiscordName}
               allTags={allTags}
               playerTags={playerTags}
               noteBody={noteBody}

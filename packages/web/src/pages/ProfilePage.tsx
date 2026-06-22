@@ -77,7 +77,7 @@ export function ProfilePage() {
         </div>
 
         <ProfileRow label={t("profile.discord")}>
-          <span>{user.discordUsername}</span>
+          <span>@{user.discordUsername}</span>
         </ProfileRow>
 
         <ProfileRow label={t("profile.mcUsername")}>

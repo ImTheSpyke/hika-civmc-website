@@ -45,7 +45,7 @@ export function Nav() {
         )}
         <Link to="/profile" style={{ display: "flex", alignItems: "center", gap: 6, textDecoration: "none" }}>
           <Avatar mcUsername={user.mcUsername} size={24} />
-          <span>{user.discordDisplayName}</span>
+          <span>@{user.discordUsername}</span>
         </Link>
         <button onClick={() => logout()}>{t("nav.logout")}</button>
       </div>
