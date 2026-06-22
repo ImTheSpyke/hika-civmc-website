@@ -282,8 +282,8 @@ function Sidebar({
                 onClick={() => onPickSearchResult(u.mcUsername ?? u.discordUsername)}
               >
                 <Avatar mcUsername={u.mcUsername} size={22} />
-                <span style={{ flex: 1 }}>@{u.discordUsername}</span>
-                {u.mcUsername && <span className="mc-name">{u.mcUsername}</span>}
+                {u.mcUsername && <span style={{ flex: 1 }}>{u.mcUsername}</span>}
+                <span className="mc-name">@{u.discordUsername}</span>
               </li>
             ))}
           </ul>
