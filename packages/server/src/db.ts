@@ -74,7 +74,9 @@ async function runMigrations(): Promise<void> {
 
 export function query<T extends mysql.RowDataPacket[]>(
   sql: string,
-  params?: unknown[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params?: any[]
 ): Promise<[T, mysql.FieldPacket[]]> {
-  return pool.execute<T>(sql, params);
+  // Cast params to satisfy mysql2's overly-complex ExecuteValues union
+  return pool.execute<T>(sql, params as any);
 }

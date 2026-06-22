@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { getAvatar } from "./service.js";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -29,7 +29,7 @@ export async function avatarsRoutes(app: FastifyInstance): Promise<void> {
   );
 }
 
-async function serveSteve(reply: ReturnType<FastifyInstance["inject"]>["reply"] | any): Promise<void> {
+async function serveSteve(reply: FastifyReply): Promise<void> {
   try {
     const stevePath = path.join(__dirname, "steve.png");
     const bytes = await readFile(stevePath);
