@@ -62,7 +62,13 @@ interface LogPage {
   rows: LogEntry[];
 }
 
-type Tab = "stats" | "users" | "newspapers" | "events" | "moderation" | "log";
+type Tab = "stats" | "users" | "newspapers" | "events" | "moderation" | "log" | "settings";
+
+interface SiteSettings {
+  auto_approve_accounts: boolean;
+  auto_approve_username_changes: boolean;
+  auto_approve_newspapers: boolean;
+}
 
 export function AdminPage() {
   const { t } = useI18n();
@@ -132,7 +138,7 @@ export function AdminPage() {
     setBadges((b) => ({ ...b, moderation: Math.max(0, b.moderation - 1) }));
   }
 
-  const tabs: Tab[] = ["stats", "users", "newspapers", "events", "moderation", "log"];
+  const tabs: Tab[] = ["stats", "users", "newspapers", "events", "moderation", "log", "settings"];
   const tabBadge: Partial<Record<Tab, number>> = { users: badges.users, newspapers: badges.newspapers, events: badges.events, moderation: badges.moderation };
 
   return (
@@ -243,6 +249,7 @@ export function AdminPage() {
 
       {tab === "newspapers" && <AdminNewspapers t={t} />}
       {tab === "events" && <AdminEvents t={t} />}
+      {tab === "settings" && <AdminSettings t={t} />}
     </div>
   );
 }
@@ -254,6 +261,7 @@ const ACTION_META: Record<string, { label: string; color: string }> = {
   "user.approve":        { label: "approved",    color: "#2a7a2a" },
   "user.reject":         { label: "rejected",    color: "#8c2a2a" },
   "user.delete":         { label: "user×",       color: "#8c2a2a" },
+  "user.delete_self":    { label: "self-del",    color: "#8c2a2a" },
   "user.username_set":   { label: "mc-set",      color: "#5865f2" },
   "user.username_change_request": { label: "mc-req",  color: "#888" },
   "user.username_change_approve": { label: "mc-name+", color: "#2a7a2a" },
@@ -446,6 +454,110 @@ function AdminNewspapers({ t }: { t: (k: string) => string }) {
         </div>
       ))}
       {items.length === 0 && <p>No pending newspaper requests.</p>}
+    </div>
+  );
+}
+
+function AdminSettings({ t }: { t: (k: string, v?: Record<string, string | number>) => string }) {
+  const [settings, setSettings] = useState<SiteSettings | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [rebackfilling, setRebackfilling] = useState(false);
+  const [rebackfillDone, setRebackfillDone] = useState(false);
+
+  async function triggerRebackfill() {
+    setRebackfilling(true);
+    setRebackfillDone(false);
+    try {
+      await api.post("/api/admin/rebackfill");
+      setRebackfillDone(true);
+      setTimeout(() => setRebackfillDone(false), 3000);
+    } finally {
+      setRebackfilling(false);
+    }
+  }
+
+  useEffect(() => {
+    api.get<SiteSettings>("/api/admin/settings").then(setSettings);
+  }, []);
+
+  async function toggle(key: keyof SiteSettings) {
+    if (!settings) return;
+    const newValue = !settings[key];
+    setSaving(key);
+    try {
+      const updated = await api.patch<SiteSettings>("/api/admin/settings", { [key]: newValue });
+      setSettings(updated);
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  if (!settings) return <p>{t("common.loading")}</p>;
+
+  const rows: { key: keyof SiteSettings; label: string; description: string }[] = [
+    {
+      key: "auto_approve_accounts",
+      label: t("admin.settings.autoApproveAccounts"),
+      description: t("admin.settings.autoApproveAccountsDesc"),
+    },
+    {
+      key: "auto_approve_username_changes",
+      label: t("admin.settings.autoApproveUsernameChanges"),
+      description: t("admin.settings.autoApproveUsernameChangesDesc"),
+    },
+    {
+      key: "auto_approve_newspapers",
+      label: t("admin.settings.autoApproveNewspapers"),
+      description: t("admin.settings.autoApproveNewspapersDesc"),
+    },
+  ];
+
+  return (
+    <div>
+      <h3 style={{ marginBottom: 16 }}>{t("admin.settings.title")}</h3>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {rows.map(({ key, label, description }) => (
+          <div key={key} className="card" style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, marginBottom: 2 }}>{label}</div>
+              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{description}</div>
+            </div>
+            <button
+              onClick={() => toggle(key)}
+              disabled={saving === key}
+              style={{
+                minWidth: 56,
+                padding: "5px 14px",
+                background: settings[key] ? "var(--success)" : "var(--border)",
+                color: settings[key] ? "#fff" : "var(--text-muted)",
+                border: "none",
+                borderRadius: 20,
+                fontWeight: 700,
+                fontSize: 13,
+                transition: "background 0.2s",
+                flexShrink: 0,
+              }}
+            >
+              {settings[key] ? t("admin.settings.on") : t("admin.settings.off")}
+            </button>
+          </div>
+        ))}
+
+        <div className="card" style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, marginBottom: 2 }}>{t("admin.settings.rebackfill")}</div>
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{t("admin.settings.rebackfillDesc")}</div>
+          </div>
+          <button
+            className="btn-secondary"
+            onClick={triggerRebackfill}
+            disabled={rebackfilling}
+            style={{ flexShrink: 0 }}
+          >
+            {rebackfilling ? t("common.loading") : rebackfillDone ? t("common.saved") : t("admin.settings.rebackfillRun")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

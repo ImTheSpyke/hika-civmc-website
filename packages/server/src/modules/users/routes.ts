@@ -2,7 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { requireAuth } from "../../auth/session.js";
 import { query } from "../../db.js";
 import { adminLog } from "../admin/service.js";
-import { backfillUsername } from "./service.js";
+import { getSetting } from "../admin/settings.js";
+import { backfillUsername, releaseUsername } from "./service.js";
 import type { RowDataPacket } from "mysql2";
 
 export async function usersRoutes(app: FastifyInstance): Promise<void> {
@@ -85,8 +86,21 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
         "INSERT INTO username_change_requests (user_id, requested_mc_username, reason) VALUES (?, ?, ?)",
         [userId, mcUsername, req.body?.reason ?? ""]
       );
+      const reqId = (result as any).insertId;
       await adminLog(userId, "user.username_change_request", "user", userId, { mcUsername });
-      return reply.code(201).send({ id: (result as any).insertId });
+
+      if (await getSetting("auto_approve_username_changes")) {
+        await releaseUsername(userId);
+        await query("UPDATE users SET mc_username = ?, mc_verified = FALSE WHERE id = ?", [mcUsername, userId]);
+        await query(
+          "UPDATE username_change_requests SET status = 'approved', resolved_at = NOW() WHERE id = ?",
+          [reqId]
+        );
+        await adminLog(null, "user.username_change_approve", "user", userId, { mcUsername, auto: true });
+        await backfillUsername(mcUsername, userId);
+      }
+
+      return reply.code(201).send({ id: reqId });
     }
   );
 
@@ -96,6 +110,48 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
       "DELETE FROM username_change_requests WHERE user_id = ? AND status = 'pending'",
       [req.sessionUser!.id]
     );
+    return reply.send({ ok: true });
+  });
+
+  // Permanently delete the caller's account.
+  // Leaves a tombstone row (same id + discord_id, status='deleted', all personal
+  // data wiped) so: the numeric id is never reused, admin_log entries remain
+  // intact, and the same Discord account can re-register by updating the tombstone.
+  app.delete("/api/me", { preHandler: requireAuth }, async (req, reply) => {
+    const userId = req.sessionUser!.id;
+
+    // Release player-note backfill link before wiping mc_username
+    await releaseUsername(userId);
+
+    // Wipe all user-owned data that is not kept for integrity / logs
+    await query("DELETE FROM sessions WHERE user_id = ?", [userId]);
+    await query("DELETE FROM global_notes WHERE user_id = ?", [userId]);
+    await query("DELETE FROM player_notes WHERE author_id = ?", [userId]);
+    await query("DELETE FROM tags WHERE owner_id = ?", [userId]);
+    await query("DELETE FROM username_change_requests WHERE user_id = ?", [userId]);
+    await query("DELETE FROM newspaper_subscriptions WHERE user_id = ?", [userId]);
+    // Newspapers owned by the user: cascade deletes articles + reports via FK
+    await query("DELETE FROM newspapers WHERE owner_id = ?", [userId]);
+    await query("DELETE FROM reports WHERE reporter_id = ?", [userId]);
+
+    // Convert the user row to a tombstone: preserve id + discord_id only
+    await query(
+      `UPDATE users SET
+         discord_username = '',
+         discord_display_name = '',
+         mc_username = NULL,
+         mc_verified = FALSE,
+         status = 'deleted',
+         is_admin = FALSE,
+         public_faction_tag = NULL,
+         last_report_at = NULL
+       WHERE id = ?`,
+      [userId]
+    );
+
+    await adminLog(userId, "user.delete_self", "user", userId);
+
+    reply.clearCookie("session");
     return reply.send({ ok: true });
   });
 
@@ -164,7 +220,7 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
                 mc_username as mcUsername, mc_verified as mcVerified, public_faction_tag as publicFactionTag
          FROM users WHERE status = 'approved' ORDER BY mc_username ASC`
       );
-      reply.header("Cache-Control", "private, max-age=60");
+      reply.header("Cache-Control", "no-store");
       return reply.send(
         rows.map((r) => ({
           ...r,

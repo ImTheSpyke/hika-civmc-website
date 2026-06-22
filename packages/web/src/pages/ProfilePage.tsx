@@ -14,13 +14,16 @@ interface ChangeRequest {
 
 export function ProfilePage() {
   const { t, locale, setLocale, availableLocales } = useI18n();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [pending, setPending] = useState<ChangeRequest | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ mcUsername: "", reason: "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   function loadPending() {
     api.get<ChangeRequest | null>("/api/me/username-change").then(setPending);
@@ -53,6 +56,17 @@ export function ProfilePage() {
       setPending(null);
     } finally {
       setCancelling(false);
+    }
+  }
+
+  async function deleteAccount() {
+    setDeleting(true);
+    try {
+      await api.delete("/api/me");
+      // logout() clears the session cookie server-side and redirects to "/"
+      await logout();
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -102,6 +116,54 @@ export function ProfilePage() {
               ))}
             </select>
           </ProfileRow>
+        )}
+      </div>
+
+      {/* Danger zone */}
+      <div className="card" style={{ borderColor: "color-mix(in srgb, var(--danger) 40%, var(--border))" }}>
+        <h3 style={{ color: "var(--danger)", marginBottom: 4 }}>{t("profile.dangerZone")}</h3>
+        {!showDeleteConfirm ? (
+          <div>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>
+              {t("profile.deleteAccountDesc")}
+            </p>
+            <button className="btn-danger" onClick={() => setShowDeleteConfirm(true)}>
+              {t("profile.deleteAccount")}
+            </button>
+          </div>
+        ) : (
+          <div>
+            <p style={{ fontWeight: 700, color: "var(--danger)", marginBottom: 6 }}>
+              ⚠ {t("profile.deleteAccountWarning")}
+            </p>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>
+              {t("profile.deleteAccountConfirmDesc")}
+            </p>
+            <div className="form-field" style={{ marginBottom: 12 }}>
+              <label>{t("profile.deleteAccountTypeConfirm", { word: "DELETE" })}</label>
+              <input
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="DELETE"
+                autoComplete="off"
+              />
+            </div>
+            <div className="form-actions">
+              <button
+                className="btn-danger"
+                onClick={deleteAccount}
+                disabled={deleting || deleteConfirmText !== "DELETE"}
+              >
+                {deleting ? t("common.loading") : t("profile.deleteAccountConfirm")}
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(""); }}
+              >
+                {t("common.cancel")}
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

@@ -3,6 +3,8 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { query } from "../db.js";
 import { config } from "../config.js";
 import { adminLog } from "../modules/admin/service.js";
+import { getSetting } from "../modules/admin/settings.js";
+import { backfillUsername } from "../modules/users/service.js";
 import type { RowDataPacket } from "mysql2";
 
 const DISCORD_API = "https://discord.com/api/v10";
@@ -78,7 +80,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         global_name?: string;
       };
 
-      // Upsert user
+      // Upsert user. If a tombstone row exists (status='deleted') from a prior
+      // self-deletion, resurrect it as a fresh pending account so the same Discord
+      // account can re-register without violating the UNIQUE discord_id constraint.
       const displayName = profile.global_name ?? profile.username;
       await query(
         `INSERT INTO users (discord_id, discord_username, discord_display_name)
@@ -86,6 +90,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
          ON DUPLICATE KEY UPDATE
            discord_username = VALUES(discord_username),
            discord_display_name = VALUES(discord_display_name),
+           status = IF(status = 'deleted', 'pending', status),
            last_seen_at = NOW()`,
         [profile.id, profile.username, displayName]
       );
@@ -96,7 +101,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       );
       const user = rows[0];
 
-      // Log new user creation (only if just inserted — status defaults to pending)
+      // Treat a just-resurrected tombstone the same as a brand new account
       const isNew = user.status === "pending";
       if (isNew) {
         await adminLog(null, "user.create", "user", user.id, { discordId: profile.id });
@@ -109,6 +114,24 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           "UPDATE users SET status = 'approved', is_admin = TRUE WHERE id = ?",
           [user.id]
         );
+        // mc_username may already be set if this is a re-login after onboarding
+        const [suRows] = await query<RowDataPacket[]>(
+          "SELECT mc_username FROM users WHERE id = ?", [user.id]
+        );
+        if (suRows[0]?.mc_username) {
+          await backfillUsername(suRows[0].mc_username as string, user.id);
+        }
+      } else if (isNew && await getSetting("auto_approve_accounts")) {
+        await query("UPDATE users SET status = 'approved' WHERE id = ?", [user.id]);
+        await adminLog(null, "user.approve", "user", user.id, { auto: true });
+        // mc_username is NULL for brand-new accounts (set during onboarding later),
+        // but handle the tombstone-resurrection case where it might already be set.
+        const [auRows] = await query<RowDataPacket[]>(
+          "SELECT mc_username FROM users WHERE id = ?", [user.id]
+        );
+        if (auRows[0]?.mc_username) {
+          await backfillUsername(auRows[0].mc_username as string, user.id);
+        }
       }
 
       // Create session (30-day expiry)

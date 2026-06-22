@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { requireOnboarded } from "../../auth/session.js";
 import { query } from "../../db.js";
 import { adminLog } from "../admin/service.js";
+import { getSetting } from "../admin/settings.js";
 import type { RowDataPacket } from "mysql2";
 
 export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
@@ -125,13 +126,15 @@ export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
       if (pending.length) {
         return reply.code(429).send({ error: { code: "error.rateLimited", message: "You already have a pending newspaper request" } });
       }
+      const autoApprove = await getSetting("auto_approve_newspapers");
       const [result] = await query<RowDataPacket[]>(
-        `INSERT INTO newspapers (owner_id, name, description, request_reason)
-         VALUES (?, ?, ?, ?)`,
-        [req.sessionUser!.id, name, description ?? "", requestReason ?? ""]
+        `INSERT INTO newspapers (owner_id, name, description, request_reason, status)
+         VALUES (?, ?, ?, ?, ?)`,
+        [req.sessionUser!.id, name, description ?? "", requestReason ?? "", autoApprove ? "approved" : "pending"]
       );
-      await adminLog(req.sessionUser!.id, "newspaper.request", "newspaper", (result as any).insertId);
-      return reply.code(201).send({ id: (result as any).insertId });
+      const npId = (result as any).insertId;
+      await adminLog(req.sessionUser!.id, autoApprove ? "newspaper.approve" : "newspaper.request", "newspaper", npId, autoApprove ? { auto: true } : undefined);
+      return reply.code(201).send({ id: npId });
     }
   );
 
