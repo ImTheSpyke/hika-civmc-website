@@ -220,7 +220,7 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
                 mc_username as mcUsername, mc_verified as mcVerified, public_faction_tag as publicFactionTag
          FROM users WHERE status = 'approved' ORDER BY mc_username ASC`
       );
-      reply.header("Cache-Control", "no-store");
+      reply.header("Cache-Control", "private, max-age=60");
       return reply.send(
         rows.map((r) => ({
           ...r,
