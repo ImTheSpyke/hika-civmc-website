@@ -4,7 +4,9 @@ import type { RowDataPacket } from "mysql2";
 export type SettingKey =
   | "auto_approve_accounts"
   | "auto_approve_username_changes"
-  | "auto_approve_newspapers";
+  | "auto_approve_newspapers"
+  | "newspapers_enabled"
+  | "events_enabled";
 
 export async function getSetting(key: SettingKey): Promise<boolean> {
   const [rows] = await query<RowDataPacket[]>(
@@ -31,6 +33,8 @@ export async function getAllSettings(): Promise<Record<SettingKey, boolean>> {
     auto_approve_accounts: false,
     auto_approve_username_changes: false,
     auto_approve_newspapers: false,
+    newspapers_enabled: true,
+    events_enabled: true,
     ...out,
   };
 }

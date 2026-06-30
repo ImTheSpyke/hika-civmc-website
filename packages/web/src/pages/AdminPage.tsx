@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n/context.js";
@@ -68,6 +68,8 @@ interface SiteSettings {
   auto_approve_accounts: boolean;
   auto_approve_username_changes: boolean;
   auto_approve_newspapers: boolean;
+  newspapers_enabled: boolean;
+  events_enabled: boolean;
 }
 
 export function AdminPage() {
@@ -458,11 +460,69 @@ function AdminNewspapers({ t }: { t: (k: string) => string }) {
   );
 }
 
+function ToggleRow({
+  label, description, value, saving, onToggle,
+}: {
+  label: string; description: string; value: boolean; saving: boolean; onToggle: () => void;
+}) {
+  return (
+    <tr style={{ borderBottom: "1px solid var(--border)" }}>
+      <td style={{ padding: "8px 10px", verticalAlign: "top" }}>
+        <div style={{ fontWeight: 600, fontSize: 13 }}>{label}</div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{description}</div>
+      </td>
+      <td style={{ padding: "8px 10px", verticalAlign: "middle", whiteSpace: "nowrap", width: 1 }}>
+        <button
+          onClick={onToggle}
+          disabled={saving}
+          style={{
+            minWidth: 48, padding: "3px 12px",
+            background: value ? "var(--success)" : "var(--border)",
+            color: value ? "#fff" : "var(--text-muted)",
+            border: "none", borderRadius: 20, fontWeight: 700, fontSize: 12,
+            transition: "background 0.2s", cursor: saving ? "wait" : "pointer",
+          }}
+        >
+          {value ? "ON" : "OFF"}
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 6 }}>{title}</div>
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <tbody>{children}</tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function AdminSettings({ t }: { t: (k: string, v?: Record<string, string | number>) => string }) {
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [rebackfilling, setRebackfilling] = useState(false);
   const [rebackfillDone, setRebackfillDone] = useState(false);
+
+  useEffect(() => {
+    api.get<SiteSettings>("/api/admin/settings").then(setSettings);
+  }, []);
+
+  async function toggle(key: keyof SiteSettings) {
+    if (!settings) return;
+    setSaving(key);
+    try {
+      const updated = await api.patch<SiteSettings>("/api/admin/settings", { [key]: !settings[key] });
+      setSettings(updated);
+    } finally {
+      setSaving(null);
+    }
+  }
 
   async function triggerRebackfill() {
     setRebackfilling(true);
@@ -476,88 +536,34 @@ function AdminSettings({ t }: { t: (k: string, v?: Record<string, string | numbe
     }
   }
 
-  useEffect(() => {
-    api.get<SiteSettings>("/api/admin/settings").then(setSettings);
-  }, []);
-
-  async function toggle(key: keyof SiteSettings) {
-    if (!settings) return;
-    const newValue = !settings[key];
-    setSaving(key);
-    try {
-      const updated = await api.patch<SiteSettings>("/api/admin/settings", { [key]: newValue });
-      setSettings(updated);
-    } finally {
-      setSaving(null);
-    }
-  }
-
   if (!settings) return <p>{t("common.loading")}</p>;
 
-  const rows: { key: keyof SiteSettings; label: string; description: string }[] = [
-    {
-      key: "auto_approve_accounts",
-      label: t("admin.settings.autoApproveAccounts"),
-      description: t("admin.settings.autoApproveAccountsDesc"),
-    },
-    {
-      key: "auto_approve_username_changes",
-      label: t("admin.settings.autoApproveUsernameChanges"),
-      description: t("admin.settings.autoApproveUsernameChangesDesc"),
-    },
-    {
-      key: "auto_approve_newspapers",
-      label: t("admin.settings.autoApproveNewspapers"),
-      description: t("admin.settings.autoApproveNewspapersDesc"),
-    },
-  ];
-
   return (
-    <div>
-      <h3 style={{ marginBottom: 16 }}>{t("admin.settings.title")}</h3>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {rows.map(({ key, label, description }) => (
-          <div key={key} className="card" style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, marginBottom: 2 }}>{label}</div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{description}</div>
-            </div>
-            <button
-              onClick={() => toggle(key)}
-              disabled={saving === key}
-              style={{
-                minWidth: 56,
-                padding: "5px 14px",
-                background: settings[key] ? "var(--success)" : "var(--border)",
-                color: settings[key] ? "#fff" : "var(--text-muted)",
-                border: "none",
-                borderRadius: 20,
-                fontWeight: 700,
-                fontSize: 13,
-                transition: "background 0.2s",
-                flexShrink: 0,
-              }}
-            >
-              {settings[key] ? t("admin.settings.on") : t("admin.settings.off")}
-            </button>
-          </div>
-        ))}
+    <div style={{ maxWidth: 580 }}>
+      <SettingsSection title={t("admin.settings.categoryFeatures")}>
+        <ToggleRow label={t("admin.settings.newspapersEnabled")} description={t("admin.settings.newspapersEnabledDesc")} value={settings.newspapers_enabled} saving={saving === "newspapers_enabled"} onToggle={() => toggle("newspapers_enabled")} />
+        <ToggleRow label={t("admin.settings.eventsEnabled")} description={t("admin.settings.eventsEnabledDesc")} value={settings.events_enabled} saving={saving === "events_enabled"} onToggle={() => toggle("events_enabled")} />
+      </SettingsSection>
 
-        <div className="card" style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 600, marginBottom: 2 }}>{t("admin.settings.rebackfill")}</div>
-            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{t("admin.settings.rebackfillDesc")}</div>
-          </div>
-          <button
-            className="btn-secondary"
-            onClick={triggerRebackfill}
-            disabled={rebackfilling}
-            style={{ flexShrink: 0 }}
-          >
-            {rebackfilling ? t("common.loading") : rebackfillDone ? t("common.saved") : t("admin.settings.rebackfillRun")}
-          </button>
-        </div>
-      </div>
+      <SettingsSection title={t("admin.settings.categoryAutomation")}>
+        <ToggleRow label={t("admin.settings.autoApproveAccounts")} description={t("admin.settings.autoApproveAccountsDesc")} value={settings.auto_approve_accounts} saving={saving === "auto_approve_accounts"} onToggle={() => toggle("auto_approve_accounts")} />
+        <ToggleRow label={t("admin.settings.autoApproveUsernameChanges")} description={t("admin.settings.autoApproveUsernameChangesDesc")} value={settings.auto_approve_username_changes} saving={saving === "auto_approve_username_changes"} onToggle={() => toggle("auto_approve_username_changes")} />
+        <ToggleRow label={t("admin.settings.autoApproveNewspapers")} description={t("admin.settings.autoApproveNewspapersDesc")} value={settings.auto_approve_newspapers} saving={saving === "auto_approve_newspapers"} onToggle={() => toggle("auto_approve_newspapers")} />
+      </SettingsSection>
+
+      <SettingsSection title={t("admin.settings.categoryMaintenance")}>
+        <tr>
+          <td style={{ padding: "8px 10px", verticalAlign: "middle" }}>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>{t("admin.settings.rebackfill")}</div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{t("admin.settings.rebackfillDesc")}</div>
+          </td>
+          <td style={{ padding: "8px 10px", verticalAlign: "middle", whiteSpace: "nowrap", width: 1 }}>
+            <button className="btn-secondary btn-small" onClick={triggerRebackfill} disabled={rebackfilling}>
+              {rebackfilling ? t("common.loading") : rebackfillDone ? t("common.saved") : t("admin.settings.rebackfillRun")}
+            </button>
+          </td>
+        </tr>
+      </SettingsSection>
     </div>
   );
 }

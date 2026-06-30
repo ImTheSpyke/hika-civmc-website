@@ -5,9 +5,15 @@ import { adminLog } from "../admin/service.js";
 import { getSetting } from "../admin/settings.js";
 import type { RowDataPacket } from "mysql2";
 
+async function requireNewspapersEnabled(req: any, reply: any) {
+  if (req.sessionUser?.isAdmin) return;
+  const enabled = await getSetting("newspapers_enabled");
+  if (!enabled) return reply.code(401).send({ error: { code: "error.featureDisabled", message: "Newspapers are currently disabled" } });
+}
+
 export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
   // Public list of approved newspapers (active + archived, no owner exposed)
-  app.get("/api/newspapers", { preHandler: requireOnboarded }, async (req, reply) => {
+  app.get("/api/newspapers", { preHandler: [requireOnboarded, requireNewspapersEnabled] }, async (req, reply) => {
     const [rows] = await query<RowDataPacket[]>(
       `SELECT id, name, description, active, archived, created_at
        FROM newspapers WHERE status = 'approved'
@@ -37,7 +43,7 @@ export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
   // only sees approved + active. Owner is never exposed in the public payload.
   app.get<{ Params: { id: string } }>(
     "/api/newspapers/:id",
-    { preHandler: requireOnboarded },
+    { preHandler: [requireOnboarded, requireNewspapersEnabled] },
     async (req, reply) => {
       const id = parseInt(req.params.id, 10);
       if (Number.isNaN(id)) {
@@ -112,7 +118,7 @@ export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
   // Request newspaper creation
   app.post<{ Body: { name: string; description: string; requestReason: string } }>(
     "/api/newspapers",
-    { preHandler: requireOnboarded },
+    { preHandler: [requireOnboarded, requireNewspapersEnabled] },
     async (req, reply) => {
       const { name, description, requestReason } = req.body;
       if (!name || name.length > 80) {
@@ -139,7 +145,7 @@ export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // My newspapers
-  app.get("/api/me/newspapers", { preHandler: requireOnboarded }, async (req, reply) => {
+  app.get("/api/me/newspapers", { preHandler: [requireOnboarded, requireNewspapersEnabled] }, async (req, reply) => {
     const [rows] = await query<RowDataPacket[]>(
       `SELECT id, name, description, status, active, archived, created_at
        FROM newspapers WHERE owner_id = ? ORDER BY created_at DESC`,
@@ -176,7 +182,7 @@ export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
   // Publish an article (owner or admin, newspaper approved & not archived)
   app.post<{ Params: { id: string }; Body: { title: string; body: string } }>(
     "/api/newspapers/:id/articles",
-    { preHandler: requireOnboarded },
+    { preHandler: [requireOnboarded, requireNewspapersEnabled] },
     async (req, reply) => {
       const np = await loadManageable(req, reply);
       if (!np) return;
@@ -202,7 +208,7 @@ export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
   // Hide / unhide an article (owner or admin)
   app.patch<{ Params: { id: string; articleId: string }; Body: { active: boolean } }>(
     "/api/newspapers/:id/articles/:articleId/active",
-    { preHandler: requireOnboarded },
+    { preHandler: [requireOnboarded, requireNewspapersEnabled] },
     async (req, reply) => {
       const np = await loadManageable(req, reply);
       if (!np) return;
@@ -223,7 +229,7 @@ export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
   // Delete an article (owner or admin)
   app.delete<{ Params: { id: string; articleId: string } }>(
     "/api/newspapers/:id/articles/:articleId",
-    { preHandler: requireOnboarded },
+    { preHandler: [requireOnboarded, requireNewspapersEnabled] },
     async (req, reply) => {
       const np = await loadManageable(req, reply);
       if (!np) return;
@@ -237,7 +243,7 @@ export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
   // Hide / unhide the newspaper itself (owner or admin)
   app.patch<{ Params: { id: string }; Body: { active: boolean } }>(
     "/api/newspapers/:id/active",
-    { preHandler: requireOnboarded },
+    { preHandler: [requireOnboarded, requireNewspapersEnabled] },
     async (req, reply) => {
       const np = await loadManageable(req, reply);
       if (!np) return;
@@ -252,7 +258,7 @@ export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
   // an archive is super-admin only (see admin routes).
   app.post<{ Params: { id: string } }>(
     "/api/newspapers/:id/archive",
-    { preHandler: requireOnboarded },
+    { preHandler: [requireOnboarded, requireNewspapersEnabled] },
     async (req, reply) => {
       const np = await loadManageable(req, reply);
       if (!np) return;
@@ -265,7 +271,7 @@ export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
   // Subscribe to a newspaper
   app.post<{ Params: { id: string } }>(
     "/api/newspapers/:id/subscribe",
-    { preHandler: requireOnboarded },
+    { preHandler: [requireOnboarded, requireNewspapersEnabled] },
     async (req, reply) => {
       const id = parseInt(req.params.id, 10);
       if (Number.isNaN(id)) return reply.code(404).send({ error: { code: "error.notFound", message: "Not found" } });
@@ -285,7 +291,7 @@ export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
   // Unsubscribe from a newspaper
   app.delete<{ Params: { id: string } }>(
     "/api/newspapers/:id/subscribe",
-    { preHandler: requireOnboarded },
+    { preHandler: [requireOnboarded, requireNewspapersEnabled] },
     async (req, reply) => {
       const id = parseInt(req.params.id, 10);
       if (Number.isNaN(id)) return reply.code(404).send({ error: { code: "error.notFound", message: "Not found" } });
@@ -300,7 +306,7 @@ export async function newspapersRoutes(app: FastifyInstance): Promise<void> {
   // List subscribed newspapers
   app.get(
     "/api/me/subscriptions",
-    { preHandler: requireOnboarded },
+    { preHandler: [requireOnboarded, requireNewspapersEnabled] },
     async (req, reply) => {
       const [rows] = await query<RowDataPacket[]>(
         `SELECT n.id, n.name, n.description, n.active, n.archived, n.created_at

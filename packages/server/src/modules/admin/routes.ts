@@ -372,7 +372,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     "/api/admin/settings",
     { preHandler: requireAdmin },
     async (req, reply) => {
-      const allowed: SettingKey[] = ["auto_approve_accounts", "auto_approve_username_changes", "auto_approve_newspapers"];
+      const allowed: SettingKey[] = ["auto_approve_accounts", "auto_approve_username_changes", "auto_approve_newspapers", "newspapers_enabled", "events_enabled"];
       for (const key of allowed) {
         if (typeof req.body[key] === "boolean") {
           await setSetting(key, req.body[key]);

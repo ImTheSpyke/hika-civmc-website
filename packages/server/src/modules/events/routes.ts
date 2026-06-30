@@ -2,12 +2,19 @@ import type { FastifyInstance } from "fastify";
 import { requireOnboarded } from "../../auth/session.js";
 import { query } from "../../db.js";
 import { adminLog } from "../admin/service.js";
+import { getSetting } from "../admin/settings.js";
 import type { RowDataPacket } from "mysql2";
+
+async function requireEventsEnabled(req: any, reply: any) {
+  if (req.sessionUser?.isAdmin) return;
+  const enabled = await getSetting("events_enabled");
+  if (!enabled) return reply.code(401).send({ error: { code: "error.featureDisabled", message: "Events are currently disabled" } });
+}
 
 export async function eventsRoutes(app: FastifyInstance): Promise<void> {
   // Public event list: system pinned first, then approved & active.
   // `mine` flags events the current user created so the UI can show owner actions.
-  app.get("/api/events", { preHandler: requireOnboarded }, async (req, reply) => {
+  app.get("/api/events", { preHandler: [requireOnboarded, requireEventsEnabled] }, async (req, reply) => {
     const [rows] = await query<RowDataPacket[]>(
       `SELECT id, name, description, starts_at, duration_minutes, x, y, z, is_system, requested_by, created_at
        FROM events
@@ -39,7 +46,7 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Current user's own pending events
-  app.get("/api/me/events", { preHandler: requireOnboarded }, async (req, reply) => {
+  app.get("/api/me/events", { preHandler: [requireOnboarded, requireEventsEnabled] }, async (req, reply) => {
     const [rows] = await query<RowDataPacket[]>(
       `SELECT id, name, description, starts_at, duration_minutes, x, y, z, status, created_at
        FROM events WHERE requested_by = ? AND status = 'pending' ORDER BY created_at DESC`,
@@ -51,7 +58,7 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
   // Request an event — rate limited: 1 per 5 minutes per user
   app.post<{
     Body: { name: string; description: string; startsAt: string; durationMinutes: number; x?: number; y?: number; z?: number };
-  }>("/api/events", { preHandler: requireOnboarded }, async (req, reply) => {
+  }>("/api/events", { preHandler: [requireOnboarded, requireEventsEnabled] }, async (req, reply) => {
     const { name, description, startsAt, durationMinutes, x, y, z } = req.body;
     if (!name?.trim() || name.length > 120) {
       return reply.code(400).send({ error: { code: "error.invalidInput", message: "Name is required (max 120 chars)" } });
@@ -110,7 +117,7 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
   // Hide an event (creator or admin) — sets active = FALSE
   app.patch<{ Params: { id: string } }>(
     "/api/events/:id/hide",
-    { preHandler: requireOnboarded },
+    { preHandler: [requireOnboarded, requireEventsEnabled] },
     async (req, reply) => {
       const ev = await loadOwnedEvent(req, reply);
       if (!ev) return;
@@ -123,7 +130,7 @@ export async function eventsRoutes(app: FastifyInstance): Promise<void> {
   // Delete an event (creator or admin)
   app.delete<{ Params: { id: string } }>(
     "/api/events/:id",
-    { preHandler: requireOnboarded },
+    { preHandler: [requireOnboarded, requireEventsEnabled] },
     async (req, reply) => {
       const ev = await loadOwnedEvent(req, reply);
       if (!ev) return;
