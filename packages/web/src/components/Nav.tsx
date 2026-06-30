@@ -31,7 +31,10 @@ export function Nav() {
         {navLink("/events", t("nav.events"))}
         {user.isAdmin && navLink("/admin", t("nav.admin"))}
       </div>
-      <span className="nav-brand">CivMC Companion</span>
+      <span className="nav-brand">
+        CivMC Companion
+        <span className="nav-version">v{__APP_VERSION__}</span>
+      </span>
       <div className="nav-right">
         {availableLocales.length > 1 && (
           <select
